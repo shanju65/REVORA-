@@ -683,17 +683,16 @@ def batch(batch_id: int) -> dict[str, Any]:
 
 @app.get("/batches/{batch_id}/transactions")
 @app.get("/api/batches/{batch_id}/transactions")
-def batch_transactions_endpoint(batch_id: int, limit: int = 200) -> list[dict[str, Any]]:
+def batch_transactions_endpoint(batch_id: int, limit: int = 500) -> list[dict[str, Any]]:
     initialise()
     connection = connect()
     rows = connection.execute(
         """
         SELECT t.*, c.diagnosis, c.recommendation, c.guardrail_status, c.final_action, c.outcome, c.recovered_amount, c.confidence, c.risk_tier, c.root_cause
-        FROM batch_transactions bt
-        JOIN transactions t ON bt.transaction_id = t.transaction_id
-        LEFT JOIN recovery_cases c ON (bt.transaction_id = c.transaction_id AND c.batch_id = bt.batch_id)
-        WHERE bt.batch_id = ?
-        ORDER BY t.amount DESC
+        FROM recovery_cases c
+        JOIN transactions t ON c.transaction_id = t.transaction_id
+        WHERE c.batch_id = ?
+        ORDER BY (CASE WHEN c.outcome = 'SUCCESS' THEN 1 ELSE 2 END), c.recovered_amount DESC, t.amount DESC
         LIMIT ?
         """,
         (batch_id, limit),
@@ -702,10 +701,11 @@ def batch_transactions_endpoint(batch_id: int, limit: int = 200) -> list[dict[st
         rows = connection.execute(
             """
             SELECT t.*, c.diagnosis, c.recommendation, c.guardrail_status, c.final_action, c.outcome, c.recovered_amount, c.confidence, c.risk_tier, c.root_cause
-            FROM recovery_cases c
-            JOIN transactions t ON c.transaction_id = t.transaction_id
-            WHERE c.batch_id = ?
-            ORDER BY t.amount DESC
+            FROM batch_transactions bt
+            JOIN transactions t ON bt.transaction_id = t.transaction_id
+            LEFT JOIN recovery_cases c ON (bt.transaction_id = c.transaction_id AND c.batch_id = bt.batch_id)
+            WHERE bt.batch_id = ?
+            ORDER BY (CASE WHEN c.outcome = 'SUCCESS' THEN 1 ELSE 2 END), COALESCE(c.recovered_amount, 0) DESC, t.amount DESC
             LIMIT ?
             """,
             (batch_id, limit),

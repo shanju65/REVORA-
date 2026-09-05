@@ -784,6 +784,9 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
   const [loading, setLoading] = useState(false);
   const [batchSearch, setBatchSearch] = useState("");
   const [txSearch, setTxSearch] = useState("");
+  const [txFilter, setTxFilter] = useState<"ALL" | "RECOVERED" | "STOPPED" | "BLOCKED" | "FAILED">("ALL");
+  const [sortField, setSortField] = useState<"recovered" | "amount" | "default">("default");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const batchCacheRef = useRef<Map<number, { detail: any; transactions: any[] }>>(new Map());
 
   const loadBatches = async () => {
@@ -811,7 +814,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
     setLoading(true);
     Promise.all([
       fetch(`${API}/api/batches/${batchId}`).then((r) => r.json()),
-      fetch(`${API}/api/batches/${batchId}/transactions?limit=100`).then((r) => r.json()),
+      fetch(`${API}/api/batches/${batchId}/transactions?limit=500`).then((r) => r.json()),
     ])
       .then(([bData, txData]) => {
         const txs = Array.isArray(txData) ? txData : [];
@@ -846,7 +849,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
 
     Promise.all([
       fetch(`${API}/api/batches/${selectedBatchId}`).then((r) => r.json()),
-      fetch(`${API}/api/batches/${selectedBatchId}/transactions?limit=100`).then((r) => r.json()),
+      fetch(`${API}/api/batches/${selectedBatchId}/transactions?limit=500`).then((r) => r.json()),
     ])
       .then(([bData, txData]) => {
         if (!isCurrent) return;
@@ -875,17 +878,59 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
     );
   });
 
-  const filteredTransactions = transactions.filter((tx) => {
-    if (!txSearch.trim()) return true;
-    const term = txSearch.toLowerCase().trim();
-    return (
-      String(tx.transaction_id || "").toLowerCase().includes(term) ||
-      String(tx.customer_id || "").toLowerCase().includes(term) ||
-      String(tx.failure_reason || "").toLowerCase().includes(term) ||
-      String(tx.outcome || "").toLowerCase().includes(term) ||
-      String(tx.final_action || tx.recommendation || "").toLowerCase().includes(term)
-    );
-  });
+  const recoveredCount = transactions.filter((tx) => tx.outcome === "SUCCESS" || Number(tx.recovered_amount || 0) > 0).length;
+  const totalRecoveredSum = transactions.reduce((acc, tx) => acc + Number(tx.recovered_amount || 0), 0);
+  const stoppedCount = transactions.filter((tx) => tx.outcome === "STOPPED" || tx.guardrail_status === "STOPPED").length;
+  const blockedCount = transactions.filter((tx) => tx.outcome === "BLOCKED" || tx.guardrail_status === "BLOCKED").length;
+  const failedCount = transactions.filter((tx) => tx.outcome === "FAILED").length;
+
+  const filteredTransactions = transactions
+    .filter((tx) => {
+      if (txFilter === "RECOVERED") {
+        return tx.outcome === "SUCCESS" || Number(tx.recovered_amount || 0) > 0;
+      }
+      if (txFilter === "STOPPED") {
+        return tx.outcome === "STOPPED" || tx.guardrail_status === "STOPPED";
+      }
+      if (txFilter === "BLOCKED") {
+        return tx.outcome === "BLOCKED" || tx.guardrail_status === "BLOCKED";
+      }
+      if (txFilter === "FAILED") {
+        return tx.outcome === "FAILED";
+      }
+      return true;
+    })
+    .filter((tx) => {
+      if (!txSearch.trim()) return true;
+      const term = txSearch.toLowerCase().trim();
+      return (
+        String(tx.transaction_id || "").toLowerCase().includes(term) ||
+        String(tx.customer_id || "").toLowerCase().includes(term) ||
+        String(tx.failure_reason || "").toLowerCase().includes(term) ||
+        String(tx.outcome || "").toLowerCase().includes(term) ||
+        String(tx.final_action || tx.recommendation || "").toLowerCase().includes(term)
+      );
+    })
+    .sort((a, b) => {
+      if (sortField === "recovered") {
+        const diff = Number(a.recovered_amount || 0) - Number(b.recovered_amount || 0);
+        return sortDir === "desc" ? -diff : diff;
+      }
+      if (sortField === "amount") {
+        const diff = Number(a.amount || 0) - Number(b.amount || 0);
+        return sortDir === "desc" ? -diff : diff;
+      }
+      return 0; // maintain backend order (SUCCESS recoveries at top)
+    });
+
+  const toggleSort = (field: "recovered" | "amount") => {
+    if (sortField === field) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
 
   return (
     <section className="panel batch-history-panel">
@@ -1011,18 +1056,73 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "18px 0 10px", flexWrap: "wrap", gap: 10 }}>
-                <h4 style={{ margin: 0 }}>
-                  Transactions Processed in Batch #{batchDetail.id} ({filteredTransactions.length} of {transactions.length})
-                </h4>
-                <input
-                  type="text"
-                  className="search"
-                  placeholder="Filter transactions by ID, customer, cause..."
-                  value={txSearch}
-                  onChange={(e) => setTxSearch(e.target.value)}
-                  style={{ width: 260, fontSize: 11.5, padding: "5px 10px" }}
-                />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", margin: "18px 0 12px", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <h4 style={{ margin: "0 0 8px" }}>
+                    Transactions Processed in Batch #{batchDetail.id} ({filteredTransactions.length} of {transactions.length})
+                  </h4>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      className={`sub-nav-btn ${txFilter === "ALL" ? "active" : ""}`}
+                      onClick={() => setTxFilter("ALL")}
+                      style={{ fontSize: 11, padding: "4px 10px", height: "auto" }}
+                    >
+                      All ({transactions.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`sub-nav-btn ${txFilter === "RECOVERED" ? "active" : ""}`}
+                      onClick={() => setTxFilter("RECOVERED")}
+                      style={{
+                        fontSize: 11,
+                        padding: "4px 10px",
+                        height: "auto",
+                        borderColor: txFilter === "RECOVERED" ? "#10b981" : undefined,
+                        color: txFilter === "RECOVERED" ? "#059669" : undefined,
+                        background: txFilter === "RECOVERED" ? "#ecfdf5" : undefined,
+                        fontWeight: 700,
+                      }}
+                    >
+                      ★ Recovered ({recoveredCount}) · {formatMoney(totalRecoveredSum)}
+                    </button>
+                    <button
+                      type="button"
+                      className={`sub-nav-btn ${txFilter === "STOPPED" ? "active" : ""}`}
+                      onClick={() => setTxFilter("STOPPED")}
+                      style={{ fontSize: 11, padding: "4px 10px", height: "auto" }}
+                    >
+                      Stopped ({stoppedCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={`sub-nav-btn ${txFilter === "BLOCKED" ? "active" : ""}`}
+                      onClick={() => setTxFilter("BLOCKED")}
+                      style={{ fontSize: 11, padding: "4px 10px", height: "auto" }}
+                    >
+                      Blocked ({blockedCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={`sub-nav-btn ${txFilter === "FAILED" ? "active" : ""}`}
+                      onClick={() => setTxFilter("FAILED")}
+                      style={{ fontSize: 11, padding: "4px 10px", height: "auto" }}
+                    >
+                      Failed ({failedCount})
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    className="search"
+                    placeholder="Filter transactions by ID, customer, cause..."
+                    value={txSearch}
+                    onChange={(e) => setTxSearch(e.target.value)}
+                    style={{ width: 260, fontSize: 11.5, padding: "5px 10px" }}
+                  />
+                </div>
               </div>
 
               <div className="table-wrap">
@@ -1031,13 +1131,25 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                     <tr>
                       <th>TRANSACTION</th>
                       <th>CUSTOMER</th>
-                      <th>AMOUNT</th>
+                      <th
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                        onClick={() => toggleSort("amount")}
+                        title="Click to sort by Amount"
+                      >
+                        AMOUNT {sortField === "amount" ? (sortDir === "desc" ? "↓" : "↑") : ""}
+                      </th>
                       <th>FAILURE REASON</th>
                       <th>RISK TIER</th>
                       <th>RECOMMENDATION</th>
                       <th>GATEWAY STATUS</th>
                       <th>OUTCOME</th>
-                      <th>RECOVERED</th>
+                      <th
+                        style={{ cursor: "pointer", userSelect: "none", color: "#059669" }}
+                        onClick={() => toggleSort("recovered")}
+                        title="Click to sort by Recovered Amount"
+                      >
+                        RECOVERED {sortField === "recovered" ? (sortDir === "desc" ? "↓" : "↑") : ""}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1069,9 +1181,25 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                               {tx.guardrail_status || "APPROVED"}
                             </span>
                           </td>
-                          <td>{tx.outcome || "PENDING"}</td>
                           <td>
-                            <b>{formatMoney(tx.recovered_amount || 0)}</b>
+                            <span className={`status-pill ${tx.outcome === "SUCCESS" ? "approved" : tx.outcome?.toLowerCase() || "pending"}`}>
+                              {tx.outcome || "PENDING"}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{
+                              display: "inline-block",
+                              fontFamily: "'DM Mono', monospace",
+                              fontWeight: 700,
+                              fontSize: 12,
+                              padding: Number(tx.recovered_amount || 0) > 0 ? "2px 8px" : "0",
+                              borderRadius: 4,
+                              background: Number(tx.recovered_amount || 0) > 0 ? "#ecfdf5" : "transparent",
+                              color: Number(tx.recovered_amount || 0) > 0 ? "#059669" : "var(--muted)",
+                              border: Number(tx.recovered_amount || 0) > 0 ? "1px solid #a7f3d0" : "none",
+                            }}>
+                              {formatMoney(tx.recovered_amount || 0)}
+                            </span>
                           </td>
                         </tr>
                       ))
