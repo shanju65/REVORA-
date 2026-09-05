@@ -1,5 +1,5 @@
 # REVORA — AI Revenue Recovery 
-https://revora-woad-tau.vercel.app/
+┃ https://revora-woad-tau.vercel.app/ ┃ [![YouTube](https://img.shields.io/badge/YouTube-Demo-red?style=flat-square&logo=youtube)](https://youtu.be/2OND6ntDwFE) https://youtu.be/2OND6ntDwFE ┃
 
 > **Recover revenue before it becomes lost revenue.**
 
