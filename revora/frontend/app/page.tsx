@@ -1660,38 +1660,6 @@ export default function Home() {
                   );
                 })}
               </div>
-
-              {/* Live Database Financial Outcomes Metric Ribbon */}
-              <div className="pipeline-outcomes-ribbon">
-                <div className="outcome-ribbon-item accent">
-                  <span className="ribbon-lbl">RECOVERED CAPITAL</span>
-                  <span className="ribbon-val text-emerald">
-                    <AnimatedNumber value={metrics.revenue_recovered || 0} prefix="₹" />
-                  </span>
-                  <span className="ribbon-sub">Autonomous engine interventions</span>
-                </div>
-                <div className="outcome-ribbon-item">
-                  <span className="ribbon-lbl">REVENUE AT RISK</span>
-                  <span className="ribbon-val">
-                    <AnimatedNumber value={metrics.revenue_at_risk || 0} prefix="₹" />
-                  </span>
-                  <span className="ribbon-sub">Total failed volume evaluated</span>
-                </div>
-                <div className="outcome-ribbon-item highlight">
-                  <span className="ribbon-lbl">FINANCIAL RECOVERY RATE</span>
-                  <span className="ribbon-val text-orange">
-                    <AnimatedNumber value={Number(metrics.financial_recovery_rate || 0)} suffix="%" decimals={1} />
-                  </span>
-                  <span className="ribbon-sub">Realized capital recovery lift</span>
-                </div>
-                <div className="outcome-ribbon-item">
-                  <span className="ribbon-lbl">PAYMENTS EVALUATED</span>
-                  <span className="ribbon-val">
-                    <AnimatedNumber value={metrics.evaluated_cases || metrics.total_events || 500} />
-                  </span>
-                  <span className="ribbon-sub">Analyzed transactions across batches</span>
-                </div>
-              </div>
             </section>
 
             {/* 6. Live Recovery Preview: Actual Opportunities */}
