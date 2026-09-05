@@ -1,5 +1,11 @@
-from datetime import datetime, timedelta, timezone
+import sys
 from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import random
@@ -13,8 +19,6 @@ from pydantic import BaseModel, Field
 
 from services.audit_service import AuditService
 from services.batch_service import BatchService
-
-BASE_DIR = Path(__file__).resolve().parent
 
 # Load local .env if present without external dependency
 for potential_env in (BASE_DIR.parent / ".env", BASE_DIR / ".env"):
