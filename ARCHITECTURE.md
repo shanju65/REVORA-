@@ -17,6 +17,8 @@ No machine learning model, LLM, prompt, or conversational interface possesses th
 ---
 
 ## 2. End-to-End System Architecture
+<img width="1408" height="768" alt="Gemini_Generated_Image_hxirt6hxirt6hxir" src="https://github.com/user-attachments/assets/d7c44608-0ea3-4313-a77e-4370125c7750" />
+
 
 ```
                                   PAYMENT EVENT STREAM
