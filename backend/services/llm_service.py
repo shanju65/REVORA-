@@ -32,9 +32,11 @@ class LLMService:
                                 for line in f:
                                     if line.strip().startswith("GEMINI_API_KEY="):
                                         os.environ["GEMINI_API_KEY"] = line.strip().split("=", 1)[1].strip("'\"")
+                                    elif line.strip().startswith("LLM_API_KEY="):
+                                        os.environ["LLM_API_KEY"] = line.strip().split("=", 1)[1].strip("'\"")
                         except Exception:
                             pass
-            self.api_key = os.getenv("GEMINI_API_KEY")
+            self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("LLM_API_KEY")
         self.validator = AIOutputValidator()
         self.MODELS = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.5-flash", "gemini-3.6-flash"]
         self.model = "gemini-flash-latest"
