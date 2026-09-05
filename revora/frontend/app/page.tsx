@@ -1826,30 +1826,6 @@ export default function Home() {
               <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13.5 }}>Find and act on payments that may still be recoverable.</p>
             </div>
 
-            {/* Top Area Compact Metrics */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
-              <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 8, padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Revenue at Risk</span>
-                <b style={{ fontSize: 18, color: "var(--ink)" }}>{formatMoney(metrics.revenue_at_risk)}</b>
-              </div>
-              <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 8, padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#10b981", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Recovered</span>
-                <b style={{ fontSize: 18, color: "#10b981" }}>{formatMoney(metrics.revenue_recovered)}</b>
-              </div>
-              <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 8, padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#6366f1", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Recovery Rate</span>
-                <b style={{ fontSize: 18, color: "var(--ink)" }}>{metrics.financial_recovery_rate || 0}%</b>
-              </div>
-              <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 8, padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Open Cases</span>
-                <b style={{ fontSize: 18, color: "var(--ink)" }}>{cases.length}</b>
-              </div>
-              <div style={{ background: "white", border: "1px solid var(--line)", borderRadius: 8, padding: "14px 16px" }}>
-                <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: "#f59e0b", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Needs Review</span>
-                <b style={{ fontSize: 18, color: metrics.escalated_cases > 0 ? "#b45309" : "var(--ink)" }}>{metrics.escalated_cases || 0}</b>
-              </div>
-            </div>
-
             {/* Sub-nav */}
             <div className="sub-nav-bar">
               <button
