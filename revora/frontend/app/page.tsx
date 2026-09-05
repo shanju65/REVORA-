@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Evaluation from "./evaluation";
 import { RevoraLogo, RevoraOrbitalDiagram } from "./branding";
 import { CustomerDirectoryView, CustomerDetailView } from "./customer-components";
@@ -103,6 +103,12 @@ export default function Home() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activeStoryStep, setActiveStoryStep] = useState(1);
   const [heroCycleStage, setHeroCycleStage] = useState(0);
+
+  // Platform Command Suite & Lifecycle Flow State
+  const [activePlatformWorkspace, setActivePlatformWorkspace] = useState(1);
+  const [activeFlowStage, setActiveFlowStage] = useState(1);
+  const [flowInView, setFlowInView] = useState(false);
+  const flowSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Mobile Navigation State
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -222,6 +228,31 @@ export default function Home() {
     }, 3000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // Flow section intersection observer for scroll-triggered animation
+  useEffect(() => {
+    const el = flowSectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setFlowInView(true);
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Cycle the 5-stage recovery pipeline when in view
+  useEffect(() => {
+    if (!flowInView) return;
+    const timer = window.setInterval(() => {
+      setActiveFlowStage((prev) => (prev >= 5 ? 1 : prev + 1));
+    }, 2800);
+    return () => window.clearInterval(timer);
+  }, [flowInView]);
 
 
 
@@ -1139,211 +1170,526 @@ export default function Home() {
               </div>
             </section>
 
-            {/* 4. The Revora Platform: Enterprise Workspace Suite */}
-            <section className="section-wrapper">
+            {/* 4. The Revora Platform: Enterprise Operational Suite */}
+            <section className="section-wrapper platform-suite-wrapper" id="platform-suite">
               <div className="section-head-center">
-                <span className="section-eyebrow">PLATFORM WORKSPACE SUITE</span>
+                <span className="section-eyebrow">UNIFIED OPERATIONS SUITE</span>
                 <h2 className="section-title">The Revora Platform</h2>
                 <p className="section-subtitle">
-                  Four purpose-built operational workspaces engineered for modern revenue recovery.
+                  Four purpose-built operational workspaces engineered for total visibility, autonomous intervention, and deterministic recovery.
                 </p>
               </div>
 
-              <div className="platform-suite-grid">
-                {/* 1. Recovery Engine */}
-                <div
-                  className="platform-suite-card"
-                  onClick={() => {
-                    setView("recovery");
-                    setRecoveryTab("cases");
-                  }}
-                >
-                  <div className="suite-card-topbar">
-                    <div className="suite-icon-box">⚙️</div>
-                    <span className="suite-workspace-tag">WORKSPACE 01</span>
-                    <span className="suite-status-pill active">● Active Engine</span>
-                  </div>
-                  <h3 className="suite-card-title">Recovery Engine</h3>
-                  <p className="suite-card-desc">
-                    Manage payment recovery, monitor batch executions, and orchestrate compliant interventions across your payment stack.
-                  </p>
-
-                  {/* Micro-Preview UI Widget */}
-                  <div className="suite-preview-widget">
-                    <div className="preview-widget-head">
-                      <span className="mono">BATCH #43 · 500 CASES</span>
-                      <span className="preview-badge emerald">84% Processed</span>
-                    </div>
-                    <div className="preview-progress-track">
-                      <div className="preview-progress-fill" style={{ width: "84%" }} />
-                    </div>
-                    <div className="preview-stats-sub">
-                      <span>420 / 500 cases</span>
-                      <span className="text-emerald"><b>+₹4.12L</b> Recovered</span>
-                    </div>
-                  </div>
-
-                  <div className="suite-card-footer">
-                    <span className="suite-cta-action">Launch Recovery Engine ➔</span>
-                  </div>
-                </div>
-
-                {/* 2. Customer 360 */}
-                <div
-                  className="platform-suite-card"
-                  onClick={() => {
-                    setView("customers");
-                    setSelectedCustomerId(null);
-                  }}
-                >
-                  <div className="suite-card-topbar">
-                    <div className="suite-icon-box">👤</div>
-                    <span className="suite-workspace-tag">WORKSPACE 02</span>
-                    <span className="suite-status-pill active">● 1,000 Subscribers</span>
-                  </div>
-                  <h3 className="suite-card-title">Customer 360</h3>
-                  <p className="suite-card-desc">
-                    Understand subscriber payment behaviour, customer health scores, and historical recovery outcomes across every subscriber.
-                  </p>
-
-                  {/* Micro-Preview UI Widget */}
-                  <div className="suite-preview-widget">
-                    <div className="preview-customer-row">
-                      <div className="preview-avatar">AM</div>
-                      <div className="preview-cust-info">
-                        <b>Aarav Mehta</b> · <span className="mono">CUS-8821</span>
-                        <div className="preview-sub-text">LTV: ₹68,500 · VIP Tier</div>
+              {/* Workspace Navigation Dock (Pill Bar) */}
+              <div className="suite-nav-dock" role="tablist">
+                {[
+                  { id: 1, num: "01", icon: "⚙️", title: "Recovery Engine", pill: "Active Engine", view: "recovery", accent: "coral" },
+                  { id: 2, num: "02", icon: "👤", title: "Customer 360", pill: "1,000 Subscribers", view: "customers", accent: "indigo" },
+                  { id: 3, num: "03", icon: "⚡", title: "Revora Pulse AI", pill: "Gemini 2.0 Flash", view: "conversations", accent: "cyan" },
+                  { id: 4, num: "04", icon: "📊", title: "Recovery Intelligence", pill: "Live Ledger", view: "insights", accent: "emerald" },
+                ].map((ws) => {
+                  const isActive = activePlatformWorkspace === ws.id;
+                  return (
+                    <button
+                      key={ws.id}
+                      className={`suite-dock-btn ${ws.accent} ${isActive ? "active" : ""}`}
+                      onClick={() => setActivePlatformWorkspace(ws.id)}
+                      role="tab"
+                      aria-selected={isActive}
+                    >
+                      <span className="dock-icon">{ws.icon}</span>
+                      <div className="dock-copy">
+                        <span className="dock-num">WORKSPACE {ws.num}</span>
+                        <span className="dock-name">{ws.title}</span>
                       </div>
-                      <span className="preview-badge orange">RECOVERING</span>
-                    </div>
-                    <div className="preview-stats-sub" style={{ marginTop: 8 }}>
-                      <span>Health Score: 92/100</span>
-                      <span className="text-emerald">Optimal Window: 4h</span>
-                    </div>
-                  </div>
+                      <span className={`dock-status-dot ${ws.accent}`} />
+                    </button>
+                  );
+                })}
+              </div>
 
-                  <div className="suite-card-footer">
-                    <span className="suite-cta-action">View Customer Profiles ➔</span>
-                  </div>
-                </div>
-
-                {/* 3. Revora Pulse AI */}
-                <div
-                  className="platform-suite-card"
-                  onClick={() => {
-                    setView("conversations");
-                    setCopilotTx(null);
-                  }}
-                >
-                  <div className="suite-card-topbar">
-                    <div className="suite-icon-box">⚡</div>
-                    <span className="suite-workspace-tag">WORKSPACE 03</span>
-                    <span className="suite-status-pill active">● Gemini 2.0 Flash</span>
-                  </div>
-                  <h3 className="suite-card-title">Revora Pulse AI</h3>
-                  <p className="suite-card-desc">
-                    Investigate payment anomalies, interrogate failure root causes, and query your recovery audit trail in natural language.
-                  </p>
-
-                  {/* Micro-Preview UI Widget */}
-                  <div className="suite-preview-widget chat-preview">
-                    <div className="preview-chat-bubble user">
-                      <span>&quot;Why did HDFC batch fail at 2 AM?&quot;</span>
-                    </div>
-                    <div className="preview-chat-bubble ai">
-                      <span className="ai-dot" />
-                      <span>Bank maintenance downtime detected (02:00-03:30). <b>RETRY_LATER</b> recommended (98.2% conf).</span>
-                    </div>
-                  </div>
-
-                  <div className="suite-card-footer">
-                    <span className="suite-cta-action">Launch Pulse AI ➔</span>
-                  </div>
-                </div>
-
-                {/* 4. Recovery Intelligence */}
-                <div
-                  className="platform-suite-card"
-                  onClick={() => {
-                    setView("insights");
-                    setInsightsTab("performance");
-                  }}
-                >
-                  <div className="suite-card-topbar">
-                    <div className="suite-icon-box">📊</div>
-                    <span className="suite-workspace-tag">WORKSPACE 04</span>
-                    <span className="suite-status-pill active">● Live Financial Ledger</span>
-                  </div>
-                  <h3 className="suite-card-title">Recovery Intelligence</h3>
-                  <p className="suite-card-desc">
-                    Executive reporting, financial recovery rates, policy impact comparisons, and cryptographic compliance ledgers.
-                  </p>
-
-                  {/* Micro-Preview UI Widget */}
-                  <div className="suite-preview-widget">
-                    <div className="preview-funnel-row">
-                      <div className="funnel-stat">
-                        <small>SIGNAL RATE</small>
-                        <b>95.0%</b>
+              {/* Featured Interactive Workspace Stage */}
+              <div className="suite-featured-stage">
+                {/* 01. Recovery Engine */}
+                {activePlatformWorkspace === 1 && (
+                  <div className="suite-stage-grid animate-fade-in">
+                    <div className="stage-left-content">
+                      <div className="stage-badge-row">
+                        <span className="stage-num-badge coral">WORKSPACE 01</span>
+                        <span className="stage-status-chip emerald">● Active Operational Engine</span>
                       </div>
-                      <span className="funnel-arrow">➔</span>
-                      <div className="funnel-stat">
-                        <small>CONVERTED</small>
-                        <b className="text-emerald">61.8%</b>
+                      <h3 className="stage-title">Recovery Engine</h3>
+                      <p className="stage-desc">
+                        Orchestrate real-time batch processing, monitor automated gateway interventions, and execute compliant recovery actions across multiple payment rails without manual friction.
+                      </p>
+                      <ul className="stage-features-list">
+                        <li><span>✓</span> Automated webhook & soft-decline ingestion stream</li>
+                        <li><span>✓</span> Deterministic velocity and rate-limit guardrails</li>
+                        <li><span>✓</span> Live simulated Razorpay test recovery execution</li>
+                      </ul>
+                      <div className="stage-action-row">
+                        <button
+                          className="btn-suite-launch coral"
+                          onClick={() => {
+                            setView("recovery");
+                            setRecoveryTab("cases");
+                          }}
+                        >
+                          Launch Recovery Engine ➔
+                        </button>
                       </div>
-                      <span className="preview-badge emerald" style={{ marginLeft: "auto" }}>SHA-256</span>
                     </div>
-                    <div className="preview-stats-sub" style={{ marginTop: 8 }}>
-                      <span>Total Realized Lift</span>
-                      <span className="text-emerald"><b>+₹1.28 Cr</b> Preserved</span>
-                    </div>
-                  </div>
 
-                  <div className="suite-card-footer">
-                    <span className="suite-cta-action">Explore Intelligence ➔</span>
+                    <div className="stage-right-preview">
+                      <div className="preview-terminal-window">
+                        <div className="preview-window-topbar">
+                          <div className="preview-dots">
+                            <span className="p-dot red" />
+                            <span className="p-dot yellow" />
+                            <span className="p-dot green" />
+                          </div>
+                          <span className="preview-window-tag">RECOVERY_PIPELINE · BATCH #43</span>
+                          <span className="preview-pill emerald">84% Processed</span>
+                        </div>
+                        <div className="preview-terminal-body">
+                          <div className="preview-kpi-row">
+                            <div className="preview-kpi-block">
+                              <small>TOTAL CASES</small>
+                              <b>500 Transacted</b>
+                            </div>
+                            <div className="preview-kpi-block">
+                              <small>PROCESSED</small>
+                              <b className="text-emerald">420 Rescued</b>
+                            </div>
+                            <div className="preview-kpi-block">
+                              <small>SALVAGED VOLUME</small>
+                              <b className="text-emerald">+₹4,12,000</b>
+                            </div>
+                          </div>
+                          <div className="preview-progress-wrap">
+                            <div className="preview-progress-bar">
+                              <div className="preview-progress-active" style={{ width: "84%" }} />
+                            </div>
+                            <div className="preview-progress-labels">
+                              <span>Batch Execution Track</span>
+                              <span className="mono">420 / 500 cases</span>
+                            </div>
+                          </div>
+                          <div className="preview-telemetry-feed">
+                            <div className="telemetry-item">
+                              <span className="t-time">02:14:18</span>
+                              <span className="t-badge success">RETRY_NOW</span>
+                              <span className="t-msg">TX-9021 settled via alternate rail (+₹4,999)</span>
+                            </div>
+                            <div className="telemetry-item">
+                              <span className="t-time">02:14:12</span>
+                              <span className="t-badge delay">RETRY_LATER</span>
+                              <span className="t-msg">TX-8842 scheduled for +4h window (HDFC bank downtime)</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {/* 02. Customer 360 */}
+                {activePlatformWorkspace === 2 && (
+                  <div className="suite-stage-grid animate-fade-in">
+                    <div className="stage-left-content">
+                      <div className="stage-badge-row">
+                        <span className="stage-num-badge indigo">WORKSPACE 02</span>
+                        <span className="stage-status-chip emerald">● 1,000 Verified Subscribers</span>
+                      </div>
+                      <h3 className="stage-title">Customer 360</h3>
+                      <p className="stage-desc">
+                        Deep visibility into subscriber payment profiles, historical recovery success rates, customer risk tiers, and personalized recovery half-life windows.
+                      </p>
+                      <ul className="stage-features-list">
+                        <li><span>✓</span> Cohort health classification (Healthy, At-Risk, Recovery, Escalated)</li>
+                        <li><span>✓</span> Subscriber lifetime value (LTV) and decline history mapping</li>
+                        <li><span>✓</span> Individual customer communication and intervention timelines</li>
+                      </ul>
+                      <div className="stage-action-row">
+                        <button
+                          className="btn-suite-launch indigo"
+                          onClick={() => {
+                            setView("customers");
+                            setSelectedCustomerId(null);
+                          }}
+                        >
+                          View Customer Profiles ➔
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="stage-right-preview">
+                      <div className="preview-terminal-window">
+                        <div className="preview-window-topbar">
+                          <div className="preview-dots">
+                            <span className="p-dot red" />
+                            <span className="p-dot yellow" />
+                            <span className="p-dot green" />
+                          </div>
+                          <span className="preview-window-tag">SUBSCRIBER 360 · CUS-8821</span>
+                          <span className="preview-pill orange">RECOVERING</span>
+                        </div>
+                        <div className="preview-terminal-body">
+                          <div className="preview-customer-hero">
+                            <div className="cust-avatar-large">AM</div>
+                            <div className="cust-hero-details">
+                              <h4>Aarav Mehta</h4>
+                              <span className="mono">CUS-8821 · VIP Corporate Tier</span>
+                            </div>
+                            <div className="cust-score-badge">
+                              <small>HEALTH SCORE</small>
+                              <b className="text-emerald">92/100</b>
+                            </div>
+                          </div>
+                          <div className="preview-kpi-row">
+                            <div className="preview-kpi-block">
+                              <small>TOTAL LTV</small>
+                              <b>₹68,500</b>
+                            </div>
+                            <div className="preview-kpi-block">
+                              <small>RECOVERABILITY</small>
+                              <b className="text-emerald">94.8%</b>
+                            </div>
+                            <div className="preview-kpi-block">
+                              <small>OPTIMAL WINDOW</small>
+                              <b>4h 00m</b>
+                            </div>
+                          </div>
+                          <div className="preview-telemetry-feed">
+                            <div className="telemetry-item">
+                              <span className="t-time">LIFECYCLE</span>
+                              <span className="t-badge success">ACTIVE</span>
+                              <span className="t-msg">Last intervention: Automated friendly WhatsApp update sent</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 03. Revora Pulse AI */}
+                {activePlatformWorkspace === 3 && (
+                  <div className="suite-stage-grid animate-fade-in">
+                    <div className="stage-left-content">
+                      <div className="stage-badge-row">
+                        <span className="stage-num-badge cyan">WORKSPACE 03</span>
+                        <span className="stage-status-chip emerald">● Gemini 2.0 Flash Active</span>
+                      </div>
+                      <h3 className="stage-title">Revora Pulse AI</h3>
+                      <p className="stage-desc">
+                        Conversational neural copilot grounded on your live payment telemetry, failure logs, and recovery audit trails. Ask questions in natural language and receive grounded causal explanations.
+                      </p>
+                      <ul className="stage-features-list">
+                        <li><span>✓</span> Conversational multi-turn interrogation of complex bank declines</li>
+                        <li><span>✓</span> Grounded RAG query synthesis across live recovery cases</li>
+                        <li><span>✓</span> Contextual delay & communication recommendations</li>
+                      </ul>
+                      <div className="stage-action-row">
+                        <button
+                          className="btn-suite-launch cyan"
+                          onClick={() => {
+                            setView("conversations");
+                            setCopilotTx(null);
+                          }}
+                        >
+                          Launch Pulse AI ➔
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="stage-right-preview">
+                      <div className="preview-terminal-window">
+                        <div className="preview-window-topbar">
+                          <div className="preview-dots">
+                            <span className="p-dot red" />
+                            <span className="p-dot yellow" />
+                            <span className="p-dot green" />
+                          </div>
+                          <span className="preview-window-tag">PULSE AI · LIVE COPILOT</span>
+                          <span className="preview-pill cyan">AI REASONING</span>
+                        </div>
+                        <div className="preview-terminal-body">
+                          <div className="preview-chat-container">
+                            <div className="chat-msg-user">
+                              <span className="chat-avatar">RO</span>
+                              <div className="chat-bubble user">
+                                Why did the HDFC 2 AM batch fail?
+                              </div>
+                            </div>
+                            <div className="chat-msg-ai">
+                              <span className="chat-avatar ai">⚡</span>
+                              <div className="chat-bubble ai">
+                                <div className="ai-head-tag">DIAGNOSIS · TRANSIENT BANK ERROR</div>
+                                <p>HDFC core banking scheduled maintenance downtime detected between 02:00–03:30 AM. 42 transactions failed with 504 gateway timeout.</p>
+                                <div className="ai-recommendation-chip">
+                                  <span>Recommended: <b>RETRY_LATER (+4h)</b></span>
+                                  <span className="chip-score">98.2% Confidence</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 04. Recovery Intelligence */}
+                {activePlatformWorkspace === 4 && (
+                  <div className="suite-stage-grid animate-fade-in">
+                    <div className="stage-left-content">
+                      <div className="stage-badge-row">
+                        <span className="stage-num-badge emerald">WORKSPACE 04</span>
+                        <span className="stage-status-chip emerald">● Cryptographic Ledger Verified</span>
+                      </div>
+                      <h3 className="stage-title">Recovery Intelligence</h3>
+                      <p className="stage-desc">
+                        Executive-ready reporting, financial recovery conversion funnels, policy impact delta comparisons, and an immutable SHA-256 audit ledger for compliance.
+                      </p>
+                      <ul className="stage-features-list">
+                        <li><span>✓</span> Multi-stage recovery conversion funnel visualization</li>
+                        <li><span>✓</span> Policy version benchmarking (Baseline v1 vs Revora v2)</li>
+                        <li><span>✓</span> Tamper-evident SHA-256 cryptographic audit logs</li>
+                      </ul>
+                      <div className="stage-action-row">
+                        <button
+                          className="btn-suite-launch emerald"
+                          onClick={() => {
+                            setView("insights");
+                            setInsightsTab("performance");
+                          }}
+                        >
+                          Explore Intelligence ➔
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="stage-right-preview">
+                      <div className="preview-terminal-window">
+                        <div className="preview-window-topbar">
+                          <div className="preview-dots">
+                            <span className="p-dot red" />
+                            <span className="p-dot yellow" />
+                            <span className="p-dot green" />
+                          </div>
+                          <span className="preview-window-tag">INTELLIGENCE LEDGER · COMPLIANCE</span>
+                          <span className="preview-pill emerald">SHA-256 SEALED</span>
+                        </div>
+                        <div className="preview-terminal-body">
+                          <div className="preview-funnel-display">
+                            <div className="funnel-step">
+                              <span className="funnel-lbl">SIGNAL DETECTED</span>
+                              <b className="funnel-val">95.0%</b>
+                              <span className="funnel-sub">Identified recoverability</span>
+                            </div>
+                            <span className="funnel-sep">➔</span>
+                            <div className="funnel-step highlight">
+                              <span className="funnel-lbl">CONVERTED</span>
+                              <b className="funnel-val text-emerald">61.8%</b>
+                              <span className="funnel-sub">+14.2% Policy Lift</span>
+                            </div>
+                          </div>
+                          <div className="preview-kpi-row" style={{ marginTop: 14 }}>
+                            <div className="preview-kpi-block">
+                              <small>TOTAL REALIZED LIFT</small>
+                              <b className="text-emerald">+₹1.28 Cr</b>
+                            </div>
+                            <div className="preview-kpi-block">
+                              <small>LEDGER HASH</small>
+                              <span className="mono text-xs text-muted">9b7f…3e21</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 4 Quick Access Cards Below */}
+              <div className="suite-cards-strip">
+                {[
+                  { id: 1, num: "01", icon: "⚙️", title: "Recovery Engine", desc: "Automated batch processing & rail orchestration", view: "recovery", accent: "coral" },
+                  { id: 2, num: "02", icon: "👤", title: "Customer 360", desc: "Subscriber liquidity & health profiles", view: "customers", accent: "indigo" },
+                  { id: 3, num: "03", icon: "⚡", title: "Revora Pulse AI", desc: "Grounded natural language root cause copilot", view: "conversations", accent: "cyan" },
+                  { id: 4, num: "04", icon: "📊", title: "Recovery Intelligence", desc: "Funnel metrics & cryptographic audit ledger", view: "insights", accent: "emerald" },
+                ].map((card) => (
+                  <div
+                    key={card.id}
+                    className={`suite-strip-card ${card.accent} ${activePlatformWorkspace === card.id ? "selected" : ""}`}
+                    onClick={() => {
+                      setActivePlatformWorkspace(card.id);
+                      setView(card.view as any);
+                    }}
+                  >
+                    <div className="strip-card-top">
+                      <span className="strip-num">{card.num}</span>
+                      <span className="strip-icon">{card.icon}</span>
+                    </div>
+                    <h4 className="strip-title">{card.title}</h4>
+                    <p className="strip-desc">{card.desc}</p>
+                    <span className="strip-arrow">Open Workspace ➔</span>
+                  </div>
+                ))}
               </div>
             </section>
 
-            {/* 5. Revenue Impact: Live Animated Numbers */}
-            <section className="revenue-impact-section">
-              <div className="impact-header-block">
-                <div className="impact-title-left">
-                  <span className="eyebrow">FINANCIAL OUTCOMES</span>
-                  <h2>Recovered Revenue Impact</h2>
+            {/* 5. Autonomous Recovery Pipeline: 5-Stage Visual Lifecycle Flow */}
+            <section
+              ref={flowSectionRef}
+              className="recovery-lifecycle-pipeline-section"
+              id="pipeline-flow"
+            >
+              <div className="pipeline-ambient-glow" />
+              <div className="pipeline-header-block">
+                <div className="pipeline-title-group">
+                  <span className="pipeline-eyebrow">AUTONOMOUS REVENUE RECOVERY PIPELINE</span>
+                  <h2 className="pipeline-title">From Failed Transaction to Recovered Revenue</h2>
+                  <p className="pipeline-subtitle">
+                    End-to-end deterministic lifecycle executing across milliseconds without customer disruption.
+                  </p>
                 </div>
-                <span className="impact-live-tag">● Live Database Metrics</span>
+                <div className="pipeline-live-indicator">
+                  <span className="live-pulse-dot" />
+                  <span>Interactive Flow Telemetry</span>
+                </div>
               </div>
 
-              <div className="impact-metrics-grid">
-                <div className="impact-metric-card accent">
-                  <span className="card-lbl">Recovered Capital</span>
-                  <span className="card-val">
+              {/* Large Horizontal Flow (Desktop) / Vertical (Mobile) */}
+              <div className="pipeline-nodes-track">
+                {[
+                  {
+                    stage: 1,
+                    num: "01",
+                    title: "PAYMENT FAILED",
+                    tag: "GATEWAY EVENT",
+                    desc: "Webhook intercepts soft declines, timeouts, & bank maintenance.",
+                    telemetry: "504 Timeout · HDFC Bank",
+                    badge: "Drop Detected",
+                    type: "failed",
+                    icon: "✕",
+                  },
+                  {
+                    stage: 2,
+                    num: "02",
+                    title: "REVORA ANALYSIS",
+                    tag: "CAUSAL DIAGNOSIS",
+                    desc: "Neural & statistical ML models evaluate error causality and subscriber LTV.",
+                    telemetry: "91.4% Confidence · Transient",
+                    badge: "Root Cause Found",
+                    type: "analysis",
+                    icon: "🧠",
+                  },
+                  {
+                    stage: 3,
+                    num: "03",
+                    title: "RECOVERY OPPORTUNITY",
+                    tag: "STRATEGY SYNTHESIS",
+                    desc: "Calculates optimal 4h retry window, rail rerouting, or friendly alert.",
+                    telemetry: "Optimal Window: +4.2h",
+                    badge: "+61.8% Win Rate",
+                    type: "opportunity",
+                    icon: "🎯",
+                  },
+                  {
+                    stage: 4,
+                    num: "04",
+                    title: "ACTION APPROVED",
+                    tag: "POLICY GATEWAY",
+                    desc: "Deterministic invariants lock idempotency keys and prevent double-debits.",
+                    telemetry: "0 Breaches · Policy Passed",
+                    badge: "Guardrail Approved",
+                    type: "approved",
+                    icon: "🛡️",
+                  },
+                  {
+                    stage: 5,
+                    num: "05",
+                    title: "REVENUE RECOVERED",
+                    tag: "VALUE SECURED",
+                    desc: "Payment captured successfully, subscriber retained, ledger signed.",
+                    telemetry: "+₹1,22,433 Rescued",
+                    badge: "SHA-256 Sealed",
+                    type: "recovered",
+                    icon: "✨",
+                  },
+                ].map((node, idx) => {
+                  const isCurrent = activeFlowStage === node.stage;
+                  const isPassed = activeFlowStage > node.stage;
+                  return (
+                    <div key={node.stage} className="pipeline-node-wrapper">
+                      <div
+                        className={`pipeline-stage-card ${node.type} ${isCurrent ? "active" : ""} ${isPassed ? "passed" : ""}`}
+                        onClick={() => setActiveFlowStage(node.stage)}
+                      >
+                        <div className="node-card-topbar">
+                          <span className="node-stage-num">{node.num}</span>
+                          <span className="node-icon-bubble">{node.icon}</span>
+                          <span className="node-badge-tag">{node.badge}</span>
+                        </div>
+
+                        <h3 className="node-stage-title">{node.title}</h3>
+                        <span className="node-category-tag">{node.tag}</span>
+                        <p className="node-stage-desc">{node.desc}</p>
+
+                        <div className="node-card-footer">
+                          <span className="node-telemetry-pill">
+                            <span className="telemetry-dot" />
+                            {node.telemetry}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Connector Arrow: Horizontal on desktop, Downward on mobile */}
+                      {idx < 4 && (
+                        <div className={`pipeline-connector-flow ${activeFlowStage > node.stage ? "active" : ""}`}>
+                          <div className="connector-rail">
+                            <div className="connector-pulse-beam" />
+                          </div>
+                          <span className="connector-arrow-desktop">➔</span>
+                          <span className="connector-arrow-mobile">↓</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Live Database Financial Outcomes Metric Ribbon */}
+              <div className="pipeline-outcomes-ribbon">
+                <div className="outcome-ribbon-item accent">
+                  <span className="ribbon-lbl">RECOVERED CAPITAL</span>
+                  <span className="ribbon-val text-emerald">
                     <AnimatedNumber value={metrics.revenue_recovered || 0} prefix="₹" />
                   </span>
-                  <p className="card-sub">Successfully rescued by engine interventions</p>
+                  <span className="ribbon-sub">Autonomous engine interventions</span>
                 </div>
-                <div className="impact-metric-card">
-                  <span className="card-lbl">Revenue at Risk</span>
-                  <span className="card-val">
+                <div className="outcome-ribbon-item">
+                  <span className="ribbon-lbl">REVENUE AT RISK</span>
+                  <span className="ribbon-val">
                     <AnimatedNumber value={metrics.revenue_at_risk || 0} prefix="₹" />
                   </span>
-                  <p className="card-sub">Total failed payment volume evaluated</p>
+                  <span className="ribbon-sub">Total failed volume evaluated</span>
                 </div>
-                <div className="impact-metric-card highlight">
-                  <span className="card-lbl">Recovery Rate</span>
-                  <span className="card-val">
+                <div className="outcome-ribbon-item highlight">
+                  <span className="ribbon-lbl">FINANCIAL RECOVERY RATE</span>
+                  <span className="ribbon-val text-orange">
                     <AnimatedNumber value={Number(metrics.financial_recovery_rate || 0)} suffix="%" decimals={1} />
                   </span>
-                  <p className="card-sub">Recovered revenue / Total at-risk volume</p>
+                  <span className="ribbon-sub">Realized capital recovery lift</span>
                 </div>
-                <div className="impact-metric-card">
-                  <span className="card-lbl">Payments Evaluated</span>
-                  <span className="card-val">
+                <div className="outcome-ribbon-item">
+                  <span className="ribbon-lbl">PAYMENTS EVALUATED</span>
+                  <span className="ribbon-val">
                     <AnimatedNumber value={metrics.evaluated_cases || metrics.total_events || 500} />
                   </span>
-                  <p className="card-sub">Analyzed transactions across all batch runs</p>
+                  <span className="ribbon-sub">Analyzed transactions across batches</span>
                 </div>
               </div>
             </section>
