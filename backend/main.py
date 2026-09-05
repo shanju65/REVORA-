@@ -31,11 +31,32 @@ for potential_env in (BASE_DIR.parent / ".env", BASE_DIR / ".env"):
         except Exception:
             pass
 
-DB_PATH = Path(os.getenv("REVORA_DB_PATH", Path(__file__).resolve().parent.parent / "data" / "revora.db"))
-DB_PATH.parent.mkdir(exist_ok=True)
+SEED_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "revora.db"
+DB_PATH = Path(os.getenv("REVORA_DB_PATH", str(SEED_DB_PATH)))
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+if str(DB_PATH) != str(SEED_DB_PATH) and not DB_PATH.exists() and SEED_DB_PATH.exists():
+    try:
+        import shutil
+        shutil.copy2(SEED_DB_PATH, DB_PATH)
+    except Exception:
+        pass
+
+cors_env = os.getenv("CORS_ORIGINS", "*").strip()
+if not cors_env or cors_env == "*":
+    allow_origins = ["*"]
+    allow_credentials = False
+else:
+    allow_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+    allow_credentials = True
 
 app = FastAPI(title="Revora API", description="Autonomous Revenue Recovery Platform", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 FAILURES = ["NETWORK_ERROR", "TIMEOUT", "TEMPORARY_BANK_ERROR", "BANK_DECLINED", "INSUFFICIENT_FUNDS", "AUTHENTICATION_FAILED", "UNKNOWN_ERROR"]
 TEMPORARY = {"NETWORK_ERROR", "TIMEOUT", "TEMPORARY_BANK_ERROR"}
@@ -1070,4 +1091,12 @@ def api_global_search(q: str = Query(..., min_length=1)) -> dict[str, Any]:
         })
 
     conn.close()
-    return {"query": query, "results": results[:12]}
+    return {"query": query, "results": results[:12]}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+

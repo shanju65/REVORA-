@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export type Item = Record<string, any>;
 
 export const pretty = (value: any) =>
@@ -726,7 +728,7 @@ export function PolicyComparisonCard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/analytics/policy-comparison")
+    fetch(`${API}/analytics/policy-comparison`)
       .then((res) => res.json())
       .then((d) => {
         setData(d);
@@ -891,7 +893,7 @@ export function AgentInsightsSection() {
   const [insights, setInsights] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/analytics/agent-insights")
+    fetch(`${API}/analytics/agent-insights`)
       .then((res) => res.json())
       .then((data) => setInsights(Array.isArray(data) ? data : []))
       .catch(() => {});
