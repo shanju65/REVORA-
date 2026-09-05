@@ -784,6 +784,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
   const [loading, setLoading] = useState(false);
   const [batchSearch, setBatchSearch] = useState("");
   const [txSearch, setTxSearch] = useState("");
+  const batchCacheRef = useRef<Map<number, { detail: any; transactions: any[] }>>(new Map());
 
   const loadBatches = async () => {
     try {
@@ -798,23 +799,70 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
     }
   };
 
+  const handleRefresh = () => {
+    batchCacheRef.current.clear();
+    loadBatches();
+    if (selectedBatchId !== null) {
+      fetchBatchData(selectedBatchId);
+    }
+  };
+
+  const fetchBatchData = (batchId: number) => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API}/api/batches/${batchId}`).then((r) => r.json()),
+      fetch(`${API}/api/batches/${batchId}/transactions?limit=100`).then((r) => r.json()),
+    ])
+      .then(([bData, txData]) => {
+        const txs = Array.isArray(txData) ? txData : [];
+        batchCacheRef.current.set(batchId, { detail: bData, transactions: txs });
+        if (selectedBatchId === batchId) {
+          setBatchDetail(bData);
+          setTransactions(txs);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     loadBatches();
   }, []);
 
   useEffect(() => {
     if (selectedBatchId === null) return;
+
+    // Fast-path: Check in-memory cache for instant 0ms switch
+    const cached = batchCacheRef.current.get(selectedBatchId);
+    if (cached) {
+      setBatchDetail(cached.detail);
+      setTransactions(cached.transactions);
+      setLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
     setLoading(true);
+
     Promise.all([
       fetch(`${API}/api/batches/${selectedBatchId}`).then((r) => r.json()),
       fetch(`${API}/api/batches/${selectedBatchId}/transactions?limit=100`).then((r) => r.json()),
     ])
       .then(([bData, txData]) => {
+        if (!isCurrent) return;
+        const txs = Array.isArray(txData) ? txData : [];
+        batchCacheRef.current.set(selectedBatchId, { detail: bData, transactions: txs });
         setBatchDetail(bData);
-        setTransactions(Array.isArray(txData) ? txData : []);
+        setTransactions(txs);
       })
       .catch(() => undefined)
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (isCurrent) setLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [selectedBatchId]);
 
   const filteredBatches = batches.filter((b) => {
@@ -850,7 +898,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
             Metrics are computed strictly from that batch's actual processed transactions.
           </p>
         </div>
-        <button className="refresh-btn" onClick={loadBatches}>
+        <button className="refresh-btn" onClick={handleRefresh}>
           ↻ Refresh Batches
         </button>
       </div>
@@ -901,14 +949,35 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
           </div>
         </div>
 
-        <div className="batch-detail-main">
+        <div className="batch-detail-main" style={{ position: "relative" }}>
+          {loading && batchDetail && (
+            <div
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 12,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(255,255,255,0.92)",
+                padding: "3px 10px",
+                borderRadius: 12,
+                border: "1px solid var(--line)",
+                fontSize: 11,
+                color: "var(--muted)",
+                zIndex: 10,
+              }}
+            >
+              <span className="pulse-dot" /> Loading...
+            </div>
+          )}
           {loading && !batchDetail ? (
             <div className="empty-state" style={{ padding: 40 }}>
               <span className="pulse-dot" style={{ display: "inline-block", marginRight: 8 }} />
               Loading metrics and transactions for Batch #{selectedBatchId}...
             </div>
           ) : batchDetail ? (
-            <div>
+            <div style={{ opacity: loading ? 0.75 : 1, transition: "opacity 0.15s ease" }}>
               <div className="batch-meta-summary-card">
                 <div className="meta-item">
                   <label>BATCH ID</label>

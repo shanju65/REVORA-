@@ -74,6 +74,9 @@ def connect() -> sqlite3.Connection:
         connection.execute("PRAGMA journal_mode=WAL;")
         connection.execute("PRAGMA busy_timeout=30000;")
         connection.execute("PRAGMA synchronous=NORMAL;")
+        connection.execute("PRAGMA cache_size = -64000;")
+        connection.execute("PRAGMA temp_store = MEMORY;")
+        connection.execute("PRAGMA mmap_size = 268435456;")
     except Exception:
         pass
     return connection
@@ -188,6 +191,34 @@ def initialise() -> None:
         legacy_batch = ", batch_id" if "batch_id" in recovery_columns else ""
         connection.execute(f"INSERT INTO recovery_cases (transaction_id, diagnosis, recovery_probability, confidence, recommendation, reason, guardrail_status, blocked_reason, guardrail_name, final_action, outcome, recovered_amount, analyzed_at, executed_at{legacy_batch}) SELECT transaction_id, diagnosis, recovery_probability, confidence, recommendation, reason, guardrail_status, blocked_reason, guardrail_name, final_action, outcome, recovered_amount, analyzed_at, executed_at{legacy_batch} FROM recovery_cases_legacy")
         connection.execute("DROP TABLE recovery_cases_legacy")
+
+    # High-performance indexes for instantaneous batch metrics, transaction queries & search
+    connection.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_batch_tx ON recovery_cases (batch_id, transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_batch ON recovery_cases (batch_id);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_tx ON recovery_cases (transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_outcome ON recovery_cases (outcome);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_guardrail ON recovery_cases (guardrail_status);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_action ON recovery_cases (final_action);
+        CREATE INDEX IF NOT EXISTS idx_recovery_cases_risk_tier ON recovery_cases (risk_tier);
+        CREATE INDEX IF NOT EXISTS idx_batch_transactions_bid_tx ON batch_transactions (batch_id, transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_batch_transactions_tx ON batch_transactions (transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_customer ON transactions (customer_id);
+        CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions (payment_status);
+        CREATE INDEX IF NOT EXISTS idx_transactions_amount ON transactions (amount);
+        CREATE INDEX IF NOT EXISTS idx_transactions_recoverable ON transactions (ground_truth_recoverable);
+        CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions (timestamp);
+        CREATE INDEX IF NOT EXISTS idx_transactions_status_amount ON transactions (payment_status, amount);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_tx ON audit_logs (transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_batch ON audit_logs (batch_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp);
+        CREATE INDEX IF NOT EXISTS idx_batch_runs_status ON batch_runs (status);
+        CREATE INDEX IF NOT EXISTS idx_human_queue_status ON human_queue (status);
+        CREATE INDEX IF NOT EXISTS idx_human_queue_tx ON human_queue (transaction_id);
+        CREATE INDEX IF NOT EXISTS idx_human_queue_customer ON human_queue (customer_id);
+        CREATE INDEX IF NOT EXISTS idx_conversation_messages_conv ON conversation_messages (conversation_id);
+    """)
+
     if connection.execute("SELECT COUNT(*) FROM transactions").fetchone()[0] == 0:
         rng = random.Random(42)
         now = datetime.now(timezone.utc)
@@ -288,7 +319,7 @@ def metrics(batch_id: int | None = None) -> dict[str, Any]:
         "unresolved_cases": sum(row["outcome"] in {"PENDING", "ESCALATED"} for row in cases),
         "evaluated_cases": len(cases),
         "candidate_precision": round(success / max(1, approved), 3),
-        "candidate_recall": round(success / max(1, sum(1 for row in connection.execute("SELECT * FROM transactions WHERE ground_truth_recoverable=1").fetchall())), 3),
+        "candidate_recall": round(success / max(1, connection.execute("SELECT COUNT(*) FROM transactions WHERE ground_truth_recoverable=1").fetchone()[0]), 3),
         "metric_scope": "latest completed batch",
     }
     connection.close()
@@ -611,7 +642,17 @@ def run_batch(policy: str = "agentic_optimized_v2", sample_size: int = 500) -> d
 def batches() -> list[dict[str, Any]]:
     initialise()
     connection = connect()
-    rows = connection.execute("SELECT * FROM batch_runs ORDER BY id DESC").fetchall()
+    rows = connection.execute(
+        """
+        SELECT id, started_at, completed_at, status, events_processed, actions_executed,
+               successful_recoveries, revenue_recovered, total_events, progress,
+               current_activity, failed, escalated, blocked, stopped, revenue_at_risk,
+               current_stage, progress_percent, execution_mode, approved_action_value,
+               escalated_count, blocked_count, stopped_count, created_at, policy_version
+        FROM batch_runs
+        ORDER BY id DESC
+        """
+    ).fetchall()
     connection.close()
     out = []
     for row in rows:
