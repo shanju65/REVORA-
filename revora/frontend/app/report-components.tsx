@@ -177,17 +177,7 @@ export function RecoveryReportView({
           <div className="eyebrow orange">SECTION 1.0</div>
           <h3 style={{ margin: "4px 0 12px", fontSize: 18 }}>Executive Performance Summary</h3>
 
-          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)", margin: "14px 0" }}>
-            <div className="stat-card" style={{ minHeight: 95 }}>
-              <span className="stat-label">REVENUE AT RISK</span>
-              <strong style={{ fontSize: 20 }}>{formatMoney(ex.revenue_at_risk)}</strong>
-              <small>{ex.total_events} payment exceptions</small>
-            </div>
-            <div className="stat-card" style={{ minHeight: 95, borderTopColor: "var(--green)" }}>
-              <span className="stat-label">REVENUE RECOVERED</span>
-              <strong style={{ fontSize: 20, color: "var(--green)" }}>{formatMoney(ex.revenue_recovered)}</strong>
-              <small>{ex.successful_cases} successful recoveries</small>
-            </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", margin: "14px 0" }}>
             <div className="stat-card" style={{ minHeight: 95, borderTopColor: "var(--orange)" }}>
               <span className="stat-label">FINANCIAL RECOVERY RATE</span>
               <strong style={{ fontSize: 20, color: "var(--orange)" }}>{ex.financial_recovery_rate_pct}%</strong>
