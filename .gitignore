@@ -1,0 +1,40 @@
+# Environment & Secret Variables (Never commit secrets)
+.env
+.env*.local
+*.env
+
+# Dependencies & Build Artefacts
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+dist/
+build/
+
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+ENV/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Database Journals, Temporary Locks & Backups
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3-journal
+*.bak
+/revora.db
+backend/*.db
+test_enterprise_*.db
+
+# OS Specific
+.DS_Store
+Thumbs.db
+desktop.ini
+powershell.cmd
