@@ -1,283 +1,871 @@
-# REVORA — Autonomous AI Revenue Recovery
-**Razorpay Buildathon 2026 — Track 03: AI Revenue Recovery**
+# REVORA — AI Revenue Recovery
 
-Revora is an autonomous revenue recovery platform that detects payment failures, diagnoses root causes, recommends context-aware interventions, verifies actions against deterministic guardrails, executes bounded recoveries, and maintains an immutable audit trail.
+> **Recover revenue before it becomes lost revenue.**
 
-> **Core Architectural Principle:**
-> *"Revora separates intelligence from authority. The Recovery Agent recommends an action, but a deterministic Guardrail Engine independently determines whether that action is allowed. Only approved actions reach the Recovery Executor."*
+**Razorpay Buildathon 2026 · Track 03 — AI Revenue Recovery**
 
----
-
-## Table of Contents
-1. [Problem](#1-problem)
-2. [Solution](#2-solution)
-3. [Architecture](#3-architecture)
-4. [Agentic Workflow](#4-agentic-workflow)
-5. [Guardrail Design](#5-guardrail-design)
-6. [Recovery Actions](#6-recovery-actions)
-7. [Auditability](#7-auditability)
-8. [Evaluation](#8-evaluation)
-9. [Engineering Challenges](#9-engineering-challenges)
-10. [What Broke and How We Fixed It](#10-what-broke-and-how-we-fixed-it)
-11. [Limitations](#11-limitations)
-12. [Demo Flow](#12-demo-flow)
-13. [Testing](#13-testing)
+[![Track 03](https://img.shields.io/badge/Track-03%20AI%20Revenue%20Recovery-ff6b35?style=flat-square)](#)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square)](#)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js-111827?style=flat-square)](#)
+[![Gemini](https://img.shields.io/badge/LLM-Google%20Gemini-6366f1?style=flat-square)](#)
+[![Razorpay](https://img.shields.io/badge/Payments-Razorpay%20Test%20Sandbox-0ea5e9?style=flat-square)](#)
 
 ---
 
-## 1. Problem
-Payment failures are among the largest sources of avoidable revenue churn for subscription and e-commerce platforms. Industry benchmarks show that up to 30% of failed payments are recoverable. However, existing recovery solutions suffer from two opposite extremes:
-- **Dumb naive retries:** Rigid cron scripts retry failed payments indiscriminately, exhausting customer retries, triggering provider rate limits, increasing interchange penalty fees, and alienating customers.
-- **Unbounded AI agents:** Autonomous agents given unrestricted execution privileges over financial APIs pose critical risks of compliance violations, unintended double-charges, and runaway autonomous actions.
+## ✦ What is Revora?
 
----
+Revora is an **AI revenue-recovery platform for failed payments**.
 
-## 2. Solution
-Revora introduces **Bounded Autonomous Recovery**. It pairs contextual decision intelligence with strict, deterministic policy guardrails.
-- **Context-Aware:** Analyzes failure reason, retry history, customer lifetime payment success, transaction age, payment rail, and amount.
-- **Strictly Bounded:** An independent Guardrail Engine with veto authority deterministically checks hard limits before any execution can occur.
-- **Fully Auditable:** Every observation, analysis hypothesis, policy decision, and execution outcome is permanently written to an immutable append-only ledger.
+It detects payment revenue at risk, understands why a payment failed, considers customer and transaction context, recommends the next recovery intervention, and sends that recommendation through a **deterministic Policy Gateway** before anything can execute.
 
----
+The result is a controlled recovery loop:
 
-## 3. Architecture
-
-Revora’s design strictly enforces the separation of concerns:
-
-```
-                  PAYMENT EVENT
-                        ↓
-            ┌───────────────────────┐
-            │     RISK DETECTOR     │  ──► Detects genuine revenue at risk
-            └───────────────────────┘
-                        ↓
-            ┌───────────────────────┐
-            │    RECOVERY AGENT     │  ──► Decides WHAT SHOULD HAPPEN
-            └───────────────────────┘
-                        ↓  (Recommended Action + Confidence)
-            ┌───────────────────────┐
-            │   GUARDRAIL ENGINE    │  ──► Decides WHAT IS ALLOWED TO HAPPEN
-            └───────────────────────┘
-                        ↓  (APPROVED only)
-            ┌───────────────────────┐
-            │   RECOVERY EXECUTOR   │  ──► Executes ONLY approved actions
-            └───────────────────────┘
-                        ↓
-            ┌───────────────────────┐
-            │     AUDIT SERVICE     │  ──► Records WHAT HAPPENED
-            └───────────────────────┘
-                        ↓
-             METRICS & IMPACT FUNNEL
+```text
+DETECT
+  ↓
+UNDERSTAND
+  ↓
+DECIDE
+  ↓
+AUTHORIZE
+  ↓
+ACT
+  ↓
+MEASURE
+  ↓
+LEARN
 ```
 
-### Core Services:
-- `RiskDetector` (`backend/services/risk_detector.py`): Scans payment events to isolate failed transactions representing recoverable revenue from successful or untracked transactions.
-- `RecoveryAgent` (`backend/services/recovery_agent.py`): Analyzes 7 contextual signals to formulate a diagnosis and recommend an optimal recovery intervention. Has **zero execution authority**.
-- `GuardrailEngine` (`backend/services/guardrail_engine.py`): Enforces deterministic compliance and risk boundaries. Independently validates every recommendation. Can approve, block, escalate, or stop actions.
-- `RecoveryExecutor` (`backend/services/recovery_executor.py`): Bounded execution layer. Refuses any action with `guardrail_status != "APPROVED"`. In unapproved states, returns `0.0` recovered amount.
-- `AuditService` (`backend/services/audit_service.py`): Records immutable, structured audit entries for every lifecycle event.
-- `BatchService` (`backend/services/batch_service.py`): Coordinates the lifecycle for batch runs or single transactions with append-only persistence.
+### The principle behind Revora
+
+> **The intelligence is probabilistic. The financial authority is deterministic.**
+
+The Recovery Agent can recommend an action. It cannot authorize financial execution. The Policy/Guardrail layer independently determines whether the proposed action is allowed, and only approved actions reach the executor. fileciteturn3file0L4-L7
 
 ---
 
-## 4. Agentic Workflow
+# Problem
 
-The recovery lifecycle follows six discrete, auditable stages:
+Payment failure recovery is often stuck between two extremes:
 
+| Approach | Problem |
+|---|---|
+| **Blind retries** | Same action, regardless of customer context, failure reason, retry history, or payment state |
+| **Unbounded AI agents** | Intelligent recommendations with potentially unsafe financial execution authority |
+
+Revora sits between them:
+
+**context-aware enough to make better recovery decisions, but bounded enough to keep financial actions under deterministic control.**
+
+---
+
+# Solution
+
+Revora uses contextual recovery intelligence built around five ideas:
+
+### Context-aware
+Uses signals such as failure reason, retry history, customer payment reliability, transaction age, payment method, and amount.
+
+### Deterministically governed
+Every proposed action is independently evaluated by the Policy Gateway before execution.
+
+### Provider-aware
+Approved actions can flow through the execution layer and a Razorpay Test Sandbox integration.
+
+### Fully auditable
+Important decisions and outcomes are written to an append-only audit trail.
+
+### Measurable
+Revora measures recovered revenue rather than treating recommendations or attempted actions as successful recovery.
+
+---
+
+# Architecture
+
+```text
+                                  ┌──────────────────────┐
+                                  │        REVORA        │
+                                  │   AI REVENUE         │
+                                  │      RECOVERY        │
+                                  └──────────┬───────────┘
+                                             │
+                       ┌─────────────────────┴─────────────────────┐
+                       │           EXPERIENCE LAYER               │
+                       │                                           │
+                       │ Home                                      │
+                       │ Recovery Engine                           │
+                       │ Customer 360                              │
+                       │ Revora Pulse AI                           │
+                       │ Recovery Intelligence                     │
+                       └─────────────────────┬─────────────────────┘
+                                             │
+                                             ▼
+                                  ┌──────────────────┐
+                                  │    INGESTION     │
+                                  │ Payment Events   │
+                                  │ Validation       │
+                                  └────────┬─────────┘
+                                           ▼
+                                  ┌──────────────────┐
+                                  │    RISK ENGINE   │
+                                  │ 0–100 Risk Score │
+                                  │ Risk Tier        │
+                                  └────────┬─────────┘
+                                           ▼
+                                  ┌──────────────────┐
+                                  │   ROOT CAUSE     │
+                                  │ Rules + Gemini   │
+                                  └────────┬─────────┘
+                                           ▼
+                                  ┌──────────────────┐
+                                  │  RECOVERY AGENT  │
+                                  │ Context +        │
+                                  │ Customer History │
+                                  │ Recommendation   │
+                                  └────────┬─────────┘
+                                           ▼
+                       ╔══════════════════════════════════════╗
+                       ║       DETERMINISTIC POLICY          ║
+                       ║              GATEWAY                ║
+                       ║          FINAL AUTHORITY            ║
+                       ╚════════════════════╤═════════════════╝
+                                            │
+                              ┌─────────────┼─────────────┐
+                              ▼             ▼             ▼
+                           APPROVED      ESCALATED      STOPPED
+                              │             │             │
+                              ▼             ▼             ▼
+                        VALIDATION      REVIEW QUEUE    TERMINAL
+                              │
+                              ▼
+                         EXECUTION
+                              │
+                     ┌────────┴────────┐
+                     ▼                 ▼
+               RAZORPAY TEST       SIMULATOR
+                SANDBOX
+                     │
+                     └────────┬────────┘
+                              ▼
+                           OUTCOME
+                              │
+                              ▼
+                    ┌────────────────────┐
+                    │  AUDIT + ANALYTICS │
+                    └─────────┬──────────┘
+                              ▼
+                    RECOVERY INTELLIGENCE
+                              │
+                              ▼
+                   HISTORICAL OUTCOMES
+                              │
+                              └──────► future contextual decisions
 ```
-DETECT ──► REASON ──► DECIDE ──► GUARDRAIL ──► ACT ──► MEASURE
+
+The core service separation is explicit: Risk Detector identifies revenue at risk, Recovery Agent recommends what should happen, Guardrail Engine decides what is allowed, Recovery Executor performs approved actions, and Audit Service records what happened. fileciteturn3file0L73-L79
+
+---
+
+# Agentic Recovery Loop
+
+```text
+DETECT → REASON → DECIDE → GUARDRAIL → ACT → MEASURE
 ```
 
-1. **DETECT:** Risk Detector identifies failed payment events and classifies revenue at risk.
-2. **REASON:** Recovery Agent evaluates payment telemetry (failure reason prior, customer success rate, previous transaction volume, transaction age decay, payment method).
-3. **DECIDE:** Selects the most appropriate recovery intervention (`RETRY_NOW`, `RETRY_LATER`, `CONTACT_CUSTOMER`, `ESCALATE_TO_HUMAN`, `STOP_RECOVERY`).
-4. **GUARDRAIL:** Guardrail Engine independently checks all deterministic rules before any execution is permitted.
-5. **ACT:** Recovery Executor acts only on `APPROVED` interventions; skips and records non-approved cases.
-6. **MEASURE:** Records final recovery outcome, settles recovered revenue in the database, and publishes event to the audit trail.
+### 01 · Detect
+Identify failed payment events and the revenue associated with them.
+
+### 02 · Reason
+Evaluate payment telemetry and customer context.
+
+### 03 · Decide
+Choose one of the bounded recovery interventions:
+
+- `RETRY_NOW`
+- `RETRY_LATER`
+- `CONTACT_CUSTOMER`
+- `ESCALATE_TO_HUMAN`
+- `STOP_RECOVERY`
+
+### 04 · Guardrail
+Independently evaluate whether the proposed intervention is allowed.
+
+### 05 · Act
+Execute only approved actions.
+
+### 06 · Measure
+Record the actual outcome and recovered amount.
+
+These six stages are implemented as discrete, auditable steps. fileciteturn3file0L83-L96
 
 ---
 
-## 5. Guardrail Design
+# Deterministic Policy Gateway
 
-Guardrails are hard-coded deterministic invariants that **cannot be overridden by the AI agent**:
+The Policy Gateway is the **financial safety boundary**.
 
-| Guardrail Rule | Parameter | Limit | Failure Consequence |
-|---|---|---|---|
-| **Max Retries** | `MAX_RETRIES` | 2 prior attempts | Status: `STOPPED`, Action: `STOP_RECOVERY` |
-| **Max Auto Amount** | `MAX_AUTO_ACTION_AMOUNT` | ₹10,000 INR | Status: `ESCALATED`, Action: `ESCALATE_TO_HUMAN` |
-| **Recovery Window** | `MAX_RECOVERY_WINDOW` | 24 hours (1440 mins) | Status: `STOPPED`, Action: `STOP_RECOVERY` |
-| **Confidence Threshold** | `MIN_RECOVERY_CONFIDENCE` | 60% probability & confidence | Status: `BLOCKED`, Action: `STOP_RECOVERY` |
-| **Supported Actions** | `SUPPORTED_ACTION` | Vetted enum | Status: `BLOCKED`, Action: `STOP_RECOVERY` |
+| Policy | Default | Result when violated |
+|---|---:|---|
+| Maximum retries | 2 prior attempts | `STOPPED` |
+| Automatic action amount | ₹10,000 | `ESCALATED` |
+| Recovery window | 24 hours | `STOPPED` |
+| Minimum confidence | 60% | `BLOCKED` |
+| Supported actions | Vetted enum | `BLOCKED` |
 
----
+Additional safety conditions can stop or escalate activity for cases such as do-not-contact, revoked mandates, stolen/blocked payment states, and unsupported execution states.
 
-## 6. Recovery Actions
-
-Revora supports five bounded recovery actions:
-
-1. `RETRY_NOW`: Immediate simulated retry. Recommended for temporary network errors, timeouts, or transient bank dips with zero prior retries and strong customer history.
-2. `RETRY_LATER`: Scheduled retry after a cooling window. Recommended for intermittent bank outages to avoid cascading failures.
-3. `CONTACT_CUSTOMER`: Recommends proactive cardholder notification (SMS/email/WhatsApp) to authorize 3D Secure or top up funds before re-attempting.
-4. `ESCALATE_TO_HUMAN`: Flags high-value payments (> ₹10,000) or persistent bank declines for manual review by the merchant's operations team.
-5. `STOP_RECOVERY`: Halts all recovery activities when retry limits are reached or the 24-hour window expires, preventing compliance violations.
+The guardrails are deliberately deterministic and cannot be overridden by the AI agent. fileciteturn3file0L100-L110
 
 ---
 
-## 7. Auditability
+# Revora Pulse AI
 
-Every decision is permanently preserved:
-- **Append-Only Ledger:** The `audit_logs` table stores sequential events with ISO timestamps, transaction ID, event type, actor (`GATEWAY_MONITOR`, `RISK_DETECTOR`, `AI_AGENT`, `GUARDRAIL_ENGINE`, `RECOVERY_EXECUTOR`, `SYSTEM`), human-readable descriptions, and structured JSON metadata.
-- **Batch Isolation:** Each run produces a unique `batch_id`. Rerunning batches appends new records without destroying prior historical data.
-- **Decision Replay:** The UI includes an interactive visual replay component (`CaseReplay`) that steps through the 7 actual recorded stages of any case for live demonstration.
+**Revora Pulse** is the conversational layer of the product.
 
----
+It is designed to answer questions about:
 
-## 8. Evaluation
+- payments
+- transactions
+- customers
+- recovery cases
+- batches
+- payment failures
+- provider results
+- recovery policies
+- recovery performance
 
-Revora separates **operational metrics** from **offline model benchmark metrics**:
+### Conversation flow
 
-### Operational Metrics (`/dashboard/metrics`):
-- **Revenue at Risk:** Total sum of all failed transactions detected.
-- **Recovery Actions (Eligible / Approved):** Total amount approved by guardrails for autonomous intervention.
-- **Successful Recoveries:** Total amount successfully collected by simulated recovery.
-- **Financial Recovery Rate:** Strictly calculated as:
-  $$\text{Financial Recovery Rate} = \frac{\text{Revenue Recovered}}{\text{Revenue at Risk}} \times 100$$
-- **Operational Breakdown:** Explicit counts of successful recoveries, human escalations, blocked actions, stopped recoveries, and failed retries.
+```text
+USER
+  ↓
+INTENT + SCOPE
+  ↓
+RETRIEVAL
+  ↓
+CONTEXT
+  ↓
+GEMINI
+  ↓
+GROUNDED RESPONSE
+```
 
-### Offline Benchmark Metrics (`/evaluation/metrics`):
-- Measures model performance against isolated benchmark labels:
-  - **Precision:** True Positives / (True Positives + False Positives)
-  - **Recall:** True Positives / (True Positives + False Negatives)
-  - **F1 Score:** Harmonic mean of precision and recall
-  - **False-Positive Revenue Cost:** Financial exposure of incorrect interventions
+For action requests:
 
----
+```text
+USER REQUEST
+     ↓
+PULSE
+     ↓
+RECOVERY DECISION
+     ↓
+POLICY GATEWAY
+     ↓
+EXECUTION
+```
 
-## 9. Engineering Challenges
-
-### The Synthetic Evaluation Leakage Issue
-During development and auditing of Revora, we encountered a critical engineering issue:
-
-**The Problem:**
-Initially, the benchmark evaluation metrics appeared suspiciously high (F1 > 0.95, recall near 1.0). When we inspected the synthetic ground-truth generation logic, we discovered that the synthetic generator used the exact same combination of heuristics (e.g., matching failure reason priors and customer success thresholds) as the production `RecoveryAgent`.
-This created an **evaluation leakage**: the model was being tested against labels generated by its own decision boundaries.
-
-**The Fix:**
-1. **Isolated Benchmark Generation:** We separated ground-truth generation entirely from production reasoning logic. Benchmark labels are determined by independent probabilistic processes.
-2. **Production Isolation:** Production services (`RiskDetector`, `RecoveryAgent`, `GuardrailEngine`, `RecoveryExecutor`, `BatchService`) were audited and strictly forbidden from accessing `ground_truth_recoverable`.
-3. **Automated Verification:** Added unit test `test_ground_truth_isolation()` that verifies that stripping or modifying ground truth yields 100% identical decisions and executor outputs.
-4. **Realistic Benchmark Results:** With the leakage eliminated, the post-audit benchmark produced honest, realistic metrics: Precision 0.645, Recall 0.746, and F1 0.692. The benchmark is intentionally less optimistic, but completely trustworthy.
-
----
-
-## 10. What Broke and How We Fixed It
-
-1. **Evaluation Label Leakage:** Fixed by decoupling synthetic dataset label generation from production inference and verifying with automated isolation tests.
-2. **Schema Migration on Legacy Databases:** When adding `batch_id` and auto-incrementing `case_id` to `recovery_cases`, older SQLite instances failed on primary key collisions. Fixed by writing dynamic table migration logic in `initialise()` that renames legacy tables, copies existing records, and recreates the schema safely.
-3. **Guardrails Rules Tracking:** `rules_checked` was previously initialized as an empty list and returned empty. Fixed by recording each check (`PAYMENT_STATUS_CHECK`, `MAX_RETRIES_CHECK`, `MAX_AUTO_ACTION_AMOUNT_CHECK`, `MAX_RECOVERY_WINDOW_CHECK`, `MIN_RECOVERY_CONFIDENCE_CHECK`) to provide full transparency in audit trails.
-4. **Metric Conflation:** Previously, `guardrail_blocked_cases` was computed as `len(cases) - approved`, which conflated blocked cases with escalations and stopped cases. Fixed by separating `guardrail_blocked_cases`, `escalated_cases`, and `stopped_cases` into distinct database queries.
+Pulse can use payment/customer/case context while keeping financial authority outside the LLM.
 
 ---
 
-## 11. Limitations
+# Customer 360
 
-We believe in complete technical honesty:
-- **Simulated Recovery:** Revora interacts with a simulated recovery provider. No real customer bank accounts or credit cards are debited, and no real money is moved.
-- **Synthetic Data:** The dataset of 10,000 payment events is synthetically generated with a fixed reproducible random seed (42).
-- **Prototype Storage:** The current implementation uses SQLite and in-memory background threads. A production deployment would replace this with PostgreSQL, Redis-backed job queues (Celery/BullMQ), and distributed worker pools.
-- **Evaluation Disclaimer:** The benchmark metrics reflect performance on a synthetic distribution and should not be construed as a guarantee of identical real-world payment network performance.
-- **No Direct Razorpay Recovery Claim:** Revora demonstrates the architecture, control plane, and decision algorithms for autonomous revenue recovery; it does not claim to execute unauthorized live payment retries against Razorpay's production infrastructure.
+Customer 360 turns customer history into recovery context.
 
----
+For each customer, Revora can surface:
 
-## 12. Demo Flow
+- payment history
+- successful and failed payments
+- recovered revenue
+- amount at risk
+- open recovery cases
+- recovery history
+- customer health
 
-For live judge demonstrations and video submissions, use this exact 3-minute sequence:
+Possible operational states:
 
-### Step 1: Command Center & Architecture (0:00 - 0:45)
-- Open the Overview dashboard (`http://localhost:3000`).
-- Point out the **Recovery Loop** banner and the **Autonomous Control Architecture** component (`DETECT -> REASON -> DECIDE -> GUARDRAIL -> ACT -> MEASURE`).
-- Review the **Recovery Funnel**: Show Revenue at Risk (₹17.85M) → Recovery Actions → Successful Recoveries → Financial Recovery Rate (5.4%).
-- Click **"RUN RECOVERY BATCH"** and watch the real-time progress bar and the **LIVE RECOVERY FEED** update with database audit events.
+`HEALTHY` · `AT_RISK` · `RECOVERING` · `ESCALATED`
 
-### Step 2: Showcase the Three Safety Scenarios (0:45 - 2:00)
-Navigate to **Recovery cases** tab and use the **Demo Showcase** buttons:
-
-- **CASE A — SUCCESS:**
-  - Click **"★ Case A: Success"** (e.g., ₹4,999 network error).
-  - Open the case modal:
-    - Click **"▶ Replay Decision"** to watch the visual 7-step replay (`PAYMENT DETECTED` → `RISK IDENTIFIED` → `CONTEXT ANALYZED` → `AGENT RECOMMENDS ACTION` → `GUARDRAIL CHECK` → `EXECUTION` → `OUTCOME`).
-    - Point out the **Agent Reasoning Timeline** showing real telemetry (retry count: 0, customer success: 94%, amount: ₹4,999).
-    - Point out the **"WHY REVORA?"** explainability card with its deterministic reason and signals.
-    - Outcome: **SUCCESS** (₹4,999 recovered).
-
-- **CASE B — HIGH VALUE ESCALATION:**
-  - Click **"★ Case B: High Value"** (e.g., ₹14,999 transaction).
-  - Show that the Agent recommended an action, but the **Guardrail Engine marked it ESCALATED**.
-  - Show the **"WHY REVORA?"** explanation: *"This recovery exceeds the autonomous action amount threshold (₹10,000). Revora therefore prevents automatic execution and requires human intervention."*
-  - Show that the **Recovery Executor was NEVER called** and recovered amount is ₹0.
-  - *Proof that AI cannot bypass safety thresholds.*
-
-- **CASE C — MAXIMUM RETRIES STOP:**
-  - Click **"★ Case C: Max Retries"** (e.g., retry count 2/2).
-  - Show that Guardrail status is **STOPPED**.
-  - Show the explanation: *"Maximum retry attempts have been reached. Continuing automated recovery would violate the recovery policy."*
-  - Show that the Executor was not called.
-  - *Proof that Revora knows when NOT to recover.*
-
-### Step 3: Audit Trail & Evaluation (2:00 - 3:00)
-- Click **Audit trail** tab: show the immutable chronological record of every decision.
-- Click **Evaluation** tab: show the offline ground-truth benchmark metrics (Precision, Recall, F1, False-positive cost).
-- Explain the engineering challenge and how ground-truth isolation was verified.
+This makes recovery decisions explainable at the customer level instead of treating every failed payment as an isolated event.
 
 ---
 
-## 13. Testing
+# Razorpay Test Sandbox
 
-### Run Backend Unit Test Suite:
+Revora can use Razorpay's **Test/Sandbox environment** as its payment-provider execution layer.
+
+```text
+Recovery Case
+     ↓
+Policy Gateway
+     ↓
+APPROVED
+     ↓
+Execution Layer
+     ↓
+Razorpay TEST
+     ↓
+Provider Result
+     ↓
+Revora Outcome
+```
+
+The Test Sandbox is used to validate the provider integration without moving real customer money.
+
+Provider responses are recorded as execution/outcome data. A failed provider response is not counted as recovered revenue.
+
+> **Important:** Razorpay TEST is an integration/demo environment. Revora does not claim unauthorized live-money payment retries.
+
+---
+
+# Recovery Actions
+
+Revora supports five bounded interventions:
+
+| Action | Purpose |
+|---|---|
+| `RETRY_NOW` | Attempt an immediate retry for suitable transient failures |
+| `RETRY_LATER` | Schedule a delayed retry when waiting is safer |
+| `CONTACT_CUSTOMER` | Prompt the customer to resolve an issue before retrying |
+| `ESCALATE_TO_HUMAN` | Route higher-risk/high-value cases to operations |
+| `STOP_RECOVERY` | End automated recovery when policy says to stop |
+
+These actions are constrained by the Policy Gateway. fileciteturn3file0L114-L123
+
+---
+
+# Recovery Intelligence
+
+Revora separates operational recovery metrics from offline model evaluation.
+
+## Operational metrics
+
+### Revenue at Risk
+
+```text
+SUM(failed transaction amounts)
+```
+
+### Recovered Revenue
+
+```text
+SUM(successful recovered amounts)
+```
+
+### Financial Recovery Rate
+
+```text
+Recovered Revenue
+----------------- × 100
+Revenue at Risk
+```
+
+### Additional metrics
+
+- approved action value
+- successful recoveries
+- failed executions
+- escalations
+- blocked actions
+- stopped recoveries
+- action success rate
+- provider outcomes
+
+The recovery funnel is designed to measure actual recovered revenue, not merely attempted actions. fileciteturn3file0L135-L145
+
+---
+
+# Recovery Intelligence Report
+
+A completed batch can be summarized into one recovery report:
+
+```text
+EXECUTIVE SUMMARY
+        ↓
+RECOVERY FUNNEL
+        ↓
+ROOT CAUSE BREAKDOWN
+        ↓
+ACTION PERFORMANCE
+        ↓
+CUSTOMER INSIGHTS
+        ↓
+POLICY IMPACT
+        ↓
+SAFETY
+        ↓
+PROVIDER OUTCOMES
+```
+
+This provides a single view of what the recovery engine actually accomplished.
+
+---
+
+# Baseline vs Revora
+
+Revora can compare:
+
+```text
+BASELINE POLICY
+      vs
+REVORA POLICY
+```
+
+under the same safety constraints.
+
+The comparison can include:
+
+- recovered revenue
+- recovery rate
+- successful recoveries
+- failed actions
+- escalations
+- guardrail stops
+- incremental recovery
+
+Historical and policy comparisons should be based on persisted outcomes rather than fabricated metrics.
+
+---
+
+# Auditability
+
+Every major decision is traceable through the audit trail.
+
+Typical events include:
+
+```text
+INGESTED
+RISK_SCORED
+ROOT_CAUSE_IDENTIFIED
+AGENT_DECISION
+LLM_REQUEST
+LLM_RESPONSE
+LLM_VALIDATION
+GUARDRAIL_APPROVED
+GUARDRAIL_BLOCKED
+GUARDRAIL_ESCALATED
+EXECUTION_REQUESTED
+EXECUTION_SKIPPED
+EXECUTION_SUCCESS
+EXECUTION_FAILED
+OUTCOME_RECORDED
+HUMAN_ESCALATION
+```
+
+Each event can capture:
+
+- timestamp
+- transaction ID
+- case ID
+- event type
+- actor
+- description
+- structured metadata
+
+The system keeps batch history append-only and supports replay of recorded decision stages. fileciteturn3file0L126-L131
+
+---
+
+# Evaluation Integrity
+
+Revora deliberately separates **production decisioning** from **offline benchmark labels**.
+
+The production pipeline must not use `ground_truth_recoverable` to determine an action.
+
+Offline evaluation measures:
+
+- Precision
+- Recall
+- F1
+- True/False Positives and Negatives
+- False-positive revenue cost
+
+During development, an evaluation leakage issue was found and fixed by separating benchmark label generation from production inference and adding an isolation test. The post-audit benchmark was intentionally reported at **Precision 0.645, Recall 0.746, F1 0.692** rather than preserving inflated leaked results. fileciteturn3file0L156-L169
+
+---
+
+# Data Flow
+
+```text
+Payment Event
+     ↓
+Risk
+     ↓
+Root Cause
+     ↓
+Recovery Decision
+     ↓
+Policy
+     ↓
+Execution
+     ↓
+Outcome
+     ↓
+Audit
+     ↓
+Analytics
+     ↓
+Historical Evidence
+```
+
+Historical outcomes can then be used as contextual evidence for future recovery decisions without overriding hard safety rules.
+
+---
+
+# Product Experience
+
+Revora is organized around a small set of connected product areas:
+
+| Area | Purpose |
+|---|---|
+| **Home** | Introduces Revora and surfaces the most important recovery state |
+| **Recovery Engine** | Operate recovery cases and batches |
+| **Customer 360** | Understand customer payment and recovery history |
+| **Revora Pulse AI** | Ask grounded payment/recovery questions using text or voice |
+| **Recovery Intelligence** | Analyze recovery performance and generate reports |
+
+The goal is to make the experience feel like one recovery operating system rather than a collection of isolated AI features.
+
+---
+
+# Repository Structure
+
+```text
+revora/
+│
+├── backend/
+│   ├── main.py
+│   ├── services/
+│   │   ├── risk_detector.py
+│   │   ├── recovery_agent.py
+│   │   ├── guardrail_engine.py
+│   │   ├── recovery_executor.py
+│   │   ├── audit_service.py
+│   │   ├── batch_service.py
+│   │   ├── recovery_analytics.py
+│   │   ├── llm_service.py
+│   │   ├── rag_service.py
+│   │   └── razorpay_service.py
+│   ├── data/
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   └── package.json
+│
+├── data/
+│   └── revora.db
+│
+├── README.md
+└── .env
+```
+
+---
+
+# Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js |
+| Backend | FastAPI |
+| Language | Python / TypeScript |
+| Database | SQLite |
+| LLM | Google Gemini |
+| Retrieval | Structured + semantic RAG |
+| Validation | Pydantic |
+| Provider | Razorpay Test Sandbox |
+| API | REST |
+| Evaluation | Offline benchmark pipeline |
+
+---
+
+# Getting Started
+
+## Prerequisites
+
+- Python 3.x
+- Node.js
+- npm
+- Gemini API key for LLM features
+- Razorpay Test credentials for provider integration
+
+## Backend
+
+```powershell
+cd backend
+
+python -m venv .venv
+
+.\.venv\Scripts\pip install -r requirements.txt
+```
+
+Configure `.env`:
+
+```env
+GEMINI_API_KEY=your_gemini_key
+
+RAZORPAY_KEY_ID=your_razorpay_test_key
+RAZORPAY_KEY_SECRET=your_razorpay_test_secret
+RAZORPAY_MODE=test
+
+DATABASE_URL=sqlite:///data/revora.db
+```
+
+Never commit `.env`.
+
+Start the backend:
+
+```powershell
+.\.venv\Scripts\python main.py
+```
+
+Backend:
+
+```text
+http://localhost:8000
+```
+
+Swagger:
+
+```text
+http://localhost:8000/docs
+```
+
+## Frontend
+
+```powershell
+cd frontend
+
+npm install
+
+$env:NEXT_PUBLIC_API_URL="http://localhost:8000"
+
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# Testing
+
+## Backend
+
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_services.py
 ```
-Executes 13 comprehensive tests covering:
-1. Contextual agent decisions
-2. High-value guardrail escalation (> ₹10k)
-3. Maximum retry stop (>= 2 retries)
-4. Low-confidence block (< 60%)
-5. Recovery window expiration (> 24 hours)
-6. Executor strict rejection of unapproved actions
-7. Approved deterministic execution
-8. Rules checked list population
-9. Audit event creation and schema validation
-10. Ground-truth isolation (production decision-making never reads ground truth)
-11. Deterministic "Why Revora" structured explanations
-12. Guardrail rules evaluation
-13. Batch persistence and append-only database retention
 
-### Run Frontend Build:
+The existing test suite covers contextual decisioning, safety thresholds, execution rejection, auditing, ground-truth isolation, deterministic explanations, guardrail evaluation, and historical batch persistence. fileciteturn3file0L235-L254
+
+## Frontend
+
 ```powershell
-cd revora/frontend
+cd frontend
 npm run build
 ```
-Compiles with Turbopack and verifies TypeScript definitions across all pages and components with zero errors.
 
 ---
 
-## Local Development Setup
+# Demo Scenarios
 
-### Backend:
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\pip install -r requirements.txt
-.\.venv\Scripts\python main.py
-```
-API runs at `http://localhost:8000` (FastAPI Swagger docs at `http://localhost:8000/docs`).
+## Scenario A — Successful Recovery
 
-### Frontend:
-```powershell
-cd revora/frontend
-npm install
-$env:NEXT_PUBLIC_API_URL="http://localhost:8000"
-npm run dev
+```text
+Temporary failure
+      ↓
+High recovery probability
+      ↓
+Recovery recommendation
+      ↓
+Policy APPROVED
+      ↓
+Execution
+      ↓
+SUCCESS
 ```
-UI runs at `http://localhost:3000`.
+
+## Scenario B — High-Value Escalation
+
+```text
+Amount > ₹10,000
+      ↓
+Agent recommends recovery
+      ↓
+Policy ESCALATED
+      ↓
+Review Queue
+      ↓
+No automatic execution
+```
+
+## Scenario C — Maximum Retries
+
+```text
+Retry Count = 2
+      ↓
+Policy STOPPED
+      ↓
+No further automated recovery
+```
+
+## Scenario D — Pulse
+
+```text
+"Why did this payment fail?"
+             ↓
+Retrieve transaction + case + policy context
+             ↓
+Grounded answer
+```
+
+## Scenario E — Razorpay Test
+
+```text
+Approved case
+     ↓
+Execution Layer
+     ↓
+Razorpay TEST
+     ↓
+Provider response
+     ↓
+Case + Audit + Outcome
+```
+
+---
+
+# Engineering Challenges
+
+## Evaluation leakage
+
+An early benchmark appeared unrealistically strong because the synthetic benchmark labels were generated using logic too similar to the production agent.
+
+The system was changed to:
+
+- generate benchmark labels independently
+- isolate ground truth from production decisions
+- automatically verify that removing ground truth does not change production decisions
+- report the post-audit benchmark honestly
+
+This was one of the key engineering integrity fixes in the project. fileciteturn3file0L158-L169
+
+## Legacy database migration
+
+Historical SQLite instances required schema changes for batch and case persistence.
+
+The migration strategy preserved historical records while moving to append-only batch/case behavior.
+
+## Metric separation
+
+Guardrail blocks, escalations, stopped recoveries, and successful actions are tracked independently rather than conflated into one status count. fileciteturn3file0L173-L178
+
+---
+
+# Security Principles
+
+Revora must never:
+
+- expose API secrets
+- collect CVV
+- collect OTP
+- collect PIN
+- store full card numbers
+- allow AI to bypass the Policy Gateway
+- mark failed provider actions as recovered revenue
+- treat benchmark ground truth as a production decision signal
+
+---
+
+# Limitations
+
+Revora is a buildathon prototype.
+
+- Payment datasets are primarily synthetic.
+- Razorpay integration is demonstrated through the Test/Sandbox environment.
+- The current persistence layer uses SQLite.
+- Higher-scale production deployment would require production-grade database and worker infrastructure.
+- Benchmark performance is measured on synthetic data and should not be interpreted as a guarantee of real-world payment-network performance.
+- Live financial execution would require appropriate merchant authorization, security controls, provider agreements, and compliance review.
+
+The original project documentation explicitly distinguishes simulated/test recovery from real-money movement and avoids claiming unauthorized live Razorpay execution. fileciteturn3file0L182-L188
+
+---
+
+# Demo Script
+
+### 1. Identify the problem
+Open Revora and show a failed payment with revenue at risk.
+
+### 2. Open the case
+Show:
+
+**Risk → Root Cause → Customer Context → Recovery Recommendation**
+
+### 3. Show the safety boundary
+Use a high-value case:
+
+**AI recommendation → Policy Gateway → Escalation**
+
+> "The AI suggested the action. The deterministic policy decided that it was not allowed to execute automatically."
+
+### 4. Show successful recovery
+Use an approved case and demonstrate the execution/outcome path.
+
+### 5. Show provider integration
+Show Razorpay Test Sandbox and the actual provider response.
+
+### 6. Ask Pulse
+Ask:
+
+> "Why did this payment fail?"
+
+Then:
+
+> "What happened after the retry?"
+
+### 7. Show the result
+End on:
+
+**Recovered Revenue + Audit Trail + Recovery Intelligence**
+
+---
+
+# What Makes Revora Different?
+
+Most payment-recovery systems answer:
+
+> **"Should I retry this payment?"**
+
+Revora asks a broader question:
+
+> **"What is the safest intervention that is most likely to recover this revenue, and can I prove what happened afterward?"**
+
+That leads to the central loop:
+
+```text
+SEE THE RISK
+     ↓
+UNDERSTAND THE PAYMENT
+     ↓
+CHOOSE THE INTERVENTION
+     ↓
+CHECK THE POLICY
+     ↓
+TAKE THE ACTION
+     ↓
+MEASURE THE RESULT
+```
+
+---
+
+
+## Built For
+
+**Razorpay Buildathon 2026**  
+**Track 03 — AI Revenue Recovery**
