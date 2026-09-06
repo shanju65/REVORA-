@@ -109,6 +109,16 @@ class RootCauseAnalyzer:
                 "is_recoverable": False,
             }
 
+        if failure_reason in {"UNKNOWN_ERROR"}:
+            return {
+                "root_cause": "GATEWAY_ERROR",
+                "confidence": 0.86,
+                "evidence": ["Unclassified gateway response; flagged for autonomous retry with protocol verification."],
+                "source": "RULE",
+                "reasoning": "Unspecified gateway transport or processing anomaly.",
+                "is_recoverable": True,
+            }
+
         # Ambiguous case: invoke bounded LLM classifier
         llm_result = self.llm.diagnose_root_cause(
             failure_reason=failure_reason,

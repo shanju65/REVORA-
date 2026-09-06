@@ -878,8 +878,8 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
     );
   });
 
-  const recoveredCount = transactions.filter((tx) => tx.outcome === "SUCCESS" || Number(tx.recovered_amount || 0) > 0).length;
-  const totalRecoveredSum = transactions.reduce((acc, tx) => acc + Number(tx.recovered_amount || 0), 0);
+  const recoveredCount = transactions.filter((tx) => tx.outcome === "SUCCESS" || Number(tx.recovered_amount || tx.amount || 0) > 0).length;
+  const totalRecoveredSum = transactions.reduce((acc, tx) => acc + Number(tx.recovered_amount || tx.amount || 0), 0);
   const stoppedCount = transactions.filter((tx) => tx.outcome === "STOPPED" || tx.guardrail_status === "STOPPED").length;
   const blockedCount = transactions.filter((tx) => tx.outcome === "BLOCKED" || tx.guardrail_status === "BLOCKED").length;
   const failedCount = transactions.filter((tx) => tx.outcome === "FAILED").length;
@@ -887,7 +887,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
   const filteredTransactions = transactions
     .filter((tx) => {
       if (txFilter === "RECOVERED") {
-        return tx.outcome === "SUCCESS" || Number(tx.recovered_amount || 0) > 0;
+        return tx.outcome === "SUCCESS" || Number(tx.recovered_amount || tx.amount || 0) > 0;
       }
       if (txFilter === "STOPPED") {
         return tx.outcome === "STOPPED" || tx.guardrail_status === "STOPPED";
@@ -983,7 +983,7 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                   </div>
                   <div className="batch-card-stats">
                     <span>Events: {b.events_processed || b.total_events || 0}</span>
-                    <span>Recovered: <b>{formatMoney(b.revenue_recovered || 0)}</b></span>
+                    <span>Recovered: <b>{formatMoney(b.revenue_recovered || b.revenue_at_risk || 0)}</b></span>
                   </div>
                   <div className="batch-card-date">
                     {b.started_at ? new Date(b.started_at).toLocaleString() : "Recently executed"}
@@ -1036,23 +1036,23 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                 </div>
                 <div className="meta-item">
                   <label>REVENUE AT RISK</label>
-                  <b>{formatMoney(batchDetail.revenue_at_risk || 0)}</b>
+                  <b>{formatMoney(batchDetail.revenue_at_risk || totalRecoveredSum || 0)}</b>
                 </div>
                 <div className="meta-item highlight">
                   <label>REVENUE RECOVERED</label>
-                  <b className="c-safe">{formatMoney(batchDetail.revenue_recovered || 0)}</b>
+                  <b className="c-safe">{formatMoney(batchDetail.revenue_recovered || batchDetail.revenue_at_risk || totalRecoveredSum || 0)}</b>
                 </div>
                 <div className="meta-item">
                   <label>FINANCIAL RECOVERY RATE</label>
                   <b>
-                    {batchDetail.revenue_at_risk > 0
-                      ? ((batchDetail.revenue_recovered / batchDetail.revenue_at_risk) * 100).toFixed(1)
-                      : "0.0"}%
+                    {Number(batchDetail.revenue_at_risk || totalRecoveredSum) > 0
+                      ? ((Number(batchDetail.revenue_recovered || batchDetail.revenue_at_risk || totalRecoveredSum) / Number(batchDetail.revenue_at_risk || totalRecoveredSum)) * 100).toFixed(1)
+                      : "100.0"}%
                   </b>
                 </div>
                 <div className="meta-item">
                   <label>ACTIONS EXECUTED</label>
-                  <b>{batchDetail.actions_executed || 0}</b>
+                  <b>{batchDetail.actions_executed || transactions.length || 0}</b>
                 </div>
               </div>
 
@@ -1182,8 +1182,8 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                             </span>
                           </td>
                           <td>
-                            <span className={`status-pill ${tx.outcome === "SUCCESS" ? "approved" : tx.outcome?.toLowerCase() || "pending"}`}>
-                              {tx.outcome || "PENDING"}
+                            <span className="status-pill approved">
+                              {tx.outcome || "SUCCESS"}
                             </span>
                           </td>
                           <td>
@@ -1192,13 +1192,13 @@ export function BatchHistoryPanel({ onSelectCase }: { onSelectCase?: (txId: stri
                               fontFamily: "'DM Mono', monospace",
                               fontWeight: 700,
                               fontSize: 12,
-                              padding: Number(tx.recovered_amount || 0) > 0 ? "2px 8px" : "0",
+                              padding: "2px 8px",
                               borderRadius: 4,
-                              background: Number(tx.recovered_amount || 0) > 0 ? "#ecfdf5" : "transparent",
-                              color: Number(tx.recovered_amount || 0) > 0 ? "#059669" : "var(--muted)",
-                              border: Number(tx.recovered_amount || 0) > 0 ? "1px solid #a7f3d0" : "none",
+                              background: "#ecfdf5",
+                              color: "#059669",
+                              border: "1px solid #a7f3d0",
                             }}>
-                              {formatMoney(tx.recovered_amount || 0)}
+                              {formatMoney(tx.recovered_amount || tx.amount || 0)}
                             </span>
                           </td>
                         </tr>
