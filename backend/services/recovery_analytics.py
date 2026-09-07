@@ -177,14 +177,21 @@ class RecoveryAnalytics:
 
     def get_policy_comparison(self) -> dict[str, Any]:
         connection = self.connect()
-        # Find latest baseline_v1 and latest agentic_optimized_v2
+        # Find latest baseline_v1 and matching agentic_optimized_v2
         baseline_batch = connection.execute(
             "SELECT * FROM batch_runs WHERE status = 'COMPLETED' AND (policy_version = 'baseline_v1' OR policy_version IS NULL) ORDER BY id DESC LIMIT 1"
         ).fetchone()
 
+        base_events = baseline_batch["total_events"] if baseline_batch else 3398
+
         optimized_batch = connection.execute(
-            "SELECT * FROM batch_runs WHERE status = 'COMPLETED' AND policy_version = 'agentic_optimized_v2' ORDER BY id DESC LIMIT 1"
+            "SELECT * FROM batch_runs WHERE status = 'COMPLETED' AND policy_version = 'agentic_optimized_v2' AND (total_events = ? OR events_processed = ?) ORDER BY id DESC LIMIT 1",
+            (base_events, base_events),
         ).fetchone()
+        if not optimized_batch:
+            optimized_batch = connection.execute(
+                "SELECT * FROM batch_runs WHERE status = 'COMPLETED' AND policy_version = 'agentic_optimized_v2' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
 
         connection.close()
 

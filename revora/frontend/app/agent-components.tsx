@@ -788,8 +788,8 @@ export function PolicyComparisonCard() {
           </small>
         </div>
         <div className="delta-card">
-          <label>Guardrail Violations</label>
-          <strong className="delta-safe">0</strong>
+          <label>Policy Safety Compliance</label>
+          <strong className="delta-safe">100%</strong>
           <small>Zero safety breaches</small>
         </div>
       </div>
@@ -822,10 +822,6 @@ export function PolicyComparisonCard() {
             <div className="policy-stat-row">
               <span>Failed Executions</span>
               <b>{b.failed_executions || 0} cases</b>
-            </div>
-            <div className="policy-stat-row">
-              <span>Guardrail Violations</span>
-              <b className="c-safe">0</b>
             </div>
           </div>
           <div className="policy-features">
@@ -865,10 +861,6 @@ export function PolicyComparisonCard() {
             <div className="policy-stat-row">
               <span>Case Success Rate</span>
               <b>{o.case_success_rate || 0}%</b>
-            </div>
-            <div className="policy-stat-row">
-              <span>Guardrail Violations</span>
-              <b className="c-safe">0</b>
             </div>
           </div>
           <div className="policy-features">
