@@ -63,7 +63,9 @@ SCHEMA_SQL = """
         id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT,
         transaction_id TEXT, event_type TEXT, actor TEXT,
         description TEXT, metadata TEXT, batch_id INTEGER DEFAULT NULL,
-        case_id INTEGER DEFAULT NULL
+        case_id INTEGER DEFAULT NULL,
+        event_hash TEXT DEFAULT NULL,
+        previous_event_hash TEXT DEFAULT NULL
     );
     CREATE TABLE IF NOT EXISTS batch_runs (
         id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT,

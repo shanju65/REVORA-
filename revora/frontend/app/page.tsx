@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Evaluation from "./evaluation";
 import { RevoraLogo, RevoraOrbitalDiagram } from "./branding";
 import { CustomerDirectoryView, CustomerDetailView } from "./customer-components";
@@ -135,6 +135,17 @@ export default function Home() {
   const [selectedAudit, setSelectedAudit] = useState<Item[]>([]);
   const [activeReplayStep, setActiveReplayStep] = useState<number | null>(null);
 
+  // Cryptographic Audit Integrity State
+  const [auditIntegrity, setAuditIntegrity] = useState<{
+    valid: boolean;
+    events_checked: number;
+    first_invalid_event: number | null;
+    reason?: string;
+    algorithm?: string;
+    checked_at?: string;
+  } | null>(null);
+  const [checkingIntegrity, setCheckingIntegrity] = useState(false);
+
   // Drawer & Copilot State
   const [drawerTxId, setDrawerTxId] = useState<string | null>(null);
   const [copilotTx, setCopilotTx] = useState<string | null>(null);
@@ -211,6 +222,30 @@ export default function Home() {
     }, 3000);
     return () => window.clearInterval(timer);
   }, [view]);
+
+  // Cryptographic audit chain verification check
+  const checkAuditIntegrity = useCallback(() => {
+    setCheckingIntegrity(true);
+    fetch(`${API}/api/audit/integrity`)
+      .then((res) => res.json())
+      .then((data) => setAuditIntegrity(data))
+      .catch((err) => {
+        console.error("Audit integrity check failed:", err);
+        setAuditIntegrity({
+          valid: false,
+          events_checked: 0,
+          first_invalid_event: null,
+          reason: "NETWORK_ERROR",
+        });
+      })
+      .finally(() => setCheckingIntegrity(false));
+  }, []);
+
+  useEffect(() => {
+    if (view === "operations" && operationsTab === "audit") {
+      checkAuditIntegrity();
+    }
+  }, [view, operationsTab, checkAuditIntegrity]);
 
   // Navbar sticky scroll effect
   useEffect(() => {
@@ -2217,13 +2252,76 @@ export default function Home() {
 
             {operationsTab === "audit" && (
               <section className="panel full-panel">
-                <div className="panel-head">
+                <div className="panel-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
                   <div>
                     <div className="eyebrow">APPEND-ONLY LEDGER</div>
                     <h3>Immutable Audit Trail</h3>
                     <p className="panel-copy">
                       Every gateway observation, risk classification, AI recommendation, policy check, and provider execution is cryptographically preserved.
                     </p>
+                  </div>
+
+                  {/* Tamper-Evident SHA-256 Audit Integrity Indicator */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "14px",
+                      background: "rgba(10, 20, 36, 0.7)",
+                      padding: "10px 18px",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: "10px",
+                          height: "10px",
+                          borderRadius: "50%",
+                          background: auditIntegrity?.valid ? "#10b981" : auditIntegrity ? "#ef4444" : "#f59e0b",
+                          boxShadow: auditIntegrity?.valid ? "0 0 10px #10b981" : undefined,
+                        }}
+                      />
+                      <div>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            letterSpacing: "0.02em",
+                            color: auditIntegrity?.valid ? "#10b981" : auditIntegrity ? "#ef4444" : "#f8fafc",
+                          }}
+                        >
+                          {checkingIntegrity
+                            ? "Verifying Ledger..."
+                            : auditIntegrity?.valid
+                            ? "Audit Integrity: VERIFIED"
+                            : auditIntegrity
+                            ? "Integrity Issue Detected"
+                            : "Verifying Chain..."}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
+                          {auditIntegrity
+                            ? `${auditIntegrity.events_checked.toLocaleString()} events checked · SHA-256 Chained`
+                            : "Checking cryptographic hash chain..."}
+                          {auditIntegrity && !auditIntegrity.valid && auditIntegrity.first_invalid_event && (
+                            <span style={{ color: "#ef4444", marginLeft: "6px" }}>
+                              (Issue at Event #{auditIntegrity.first_invalid_event}: {auditIntegrity.reason})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      className="btn outline"
+                      style={{ padding: "4px 10px", fontSize: "11px", height: "auto" }}
+                      onClick={checkAuditIntegrity}
+                      disabled={checkingIntegrity}
+                      title="Recalculate and verify full SHA-256 hash chain"
+                    >
+                      {checkingIntegrity ? "Checking..." : "Verify Chain"}
+                    </button>
                   </div>
                 </div>
 
@@ -2240,8 +2338,25 @@ export default function Home() {
                       <div className="log-entry" key={String(log.id)}>
                         <span className="log-time">{new Date(String(log.timestamp)).toLocaleString()}</span>
                         <span className="event-icon">●</span>
-                        <div>
-                          <b>{pretty(log.event_type)}</b>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <b>{pretty(log.event_type)}</b>
+                            {log.event_hash && (
+                              <span
+                                style={{
+                                  fontFamily: "monospace",
+                                  fontSize: "10px",
+                                  background: "rgba(255,255,255,0.06)",
+                                  padding: "2px 6px",
+                                  borderRadius: "4px",
+                                  color: "#94a3b8",
+                                }}
+                                title={`Event Hash: ${log.event_hash}\nPrevious Hash: ${log.previous_event_hash || "GENESIS"}`}
+                              >
+                                #{String(log.event_hash).slice(0, 8)}
+                              </span>
+                            )}
+                          </div>
                           <p>
                             {log.transaction_id} · {log.description}
                           </p>

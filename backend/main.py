@@ -97,7 +97,7 @@ def initialise() -> None:
     connection.executescript("""
         CREATE TABLE IF NOT EXISTS transactions (transaction_id TEXT PRIMARY KEY, customer_id TEXT, merchant_id TEXT, amount REAL, currency TEXT, timestamp TEXT, payment_method TEXT, payment_status TEXT, failure_reason TEXT, retry_count INTEGER, customer_success_rate REAL, customer_previous_transactions INTEGER, time_since_failure_minutes INTEGER, customer_segment TEXT, risk_score REAL, ground_truth_recoverable INTEGER);
         CREATE TABLE IF NOT EXISTS recovery_cases (transaction_id TEXT PRIMARY KEY, diagnosis TEXT, recovery_probability REAL, confidence REAL, recommendation TEXT, reason TEXT, guardrail_status TEXT, blocked_reason TEXT, guardrail_name TEXT, final_action TEXT, outcome TEXT, recovered_amount REAL DEFAULT 0, analyzed_at TEXT, executed_at TEXT);
-        CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, transaction_id TEXT, event_type TEXT, actor TEXT, description TEXT, metadata TEXT);
+        CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, transaction_id TEXT, event_type TEXT, actor TEXT, description TEXT, metadata TEXT, batch_id INTEGER DEFAULT NULL, case_id INTEGER DEFAULT NULL, event_hash TEXT DEFAULT NULL, previous_event_hash TEXT DEFAULT NULL);
         CREATE TABLE IF NOT EXISTS batch_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT, completed_at TEXT, status TEXT, events_processed INTEGER DEFAULT 0, actions_executed INTEGER DEFAULT 0, successful_recoveries INTEGER DEFAULT 0, revenue_recovered REAL DEFAULT 0, report TEXT);
         CREATE TABLE IF NOT EXISTS batch_transactions (batch_id INTEGER, transaction_id TEXT, PRIMARY KEY (batch_id, transaction_id));
         CREATE TABLE IF NOT EXISTS conversations (conversation_id TEXT PRIMARY KEY, title TEXT, created_at TEXT, updated_at TEXT, active_transaction_id TEXT, active_customer_id TEXT, active_case_id INTEGER, active_batch_id INTEGER);
@@ -157,6 +157,8 @@ def initialise() -> None:
             pass
     for column, col_type in (
         ("case_id", "INTEGER DEFAULT NULL"),
+        ("event_hash", "TEXT DEFAULT NULL"),
+        ("previous_event_hash", "TEXT DEFAULT NULL"),
     ):
         try:
             connection.execute(f"ALTER TABLE audit_logs ADD COLUMN {column} {col_type}")
@@ -212,6 +214,7 @@ def initialise() -> None:
         CREATE INDEX IF NOT EXISTS idx_audit_logs_tx ON audit_logs (transaction_id);
         CREATE INDEX IF NOT EXISTS idx_audit_logs_batch ON audit_logs (batch_id);
         CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_event_hash ON audit_logs (event_hash);
         CREATE INDEX IF NOT EXISTS idx_batch_runs_status ON batch_runs (status);
         CREATE INDEX IF NOT EXISTS idx_human_queue_status ON human_queue (status);
         CREATE INDEX IF NOT EXISTS idx_human_queue_tx ON human_queue (transaction_id);
@@ -233,8 +236,10 @@ def initialise() -> None:
             latent_recovery_rate = 0.70 if recoverable_shape else 0.10 if failed else 0.0
             recoverable = int(failed and rng.random() < latent_recovery_rate)
             minutes_old = rng.randint(2, 720) if recoverable_shape else rng.randint(2, 2880) if failed else 0
-            previous_transactions = rng.randint(12, 45) if recoverable_shape else rng.randint(1, 30)
-            rows.append((f"TX{1001 + index}", f"CUS{rng.randint(100, 999)}", f"MER{rng.randint(1, 8):03d}", amount, "INR", (now - timedelta(minutes=rng.randint(2, 10080))).isoformat(), rng.choice(["CARD", "UPI", "NETBANKING", "WALLET"]), "FAILED" if failed else "SUCCESS", reason, retry_count, success_rate, previous_transactions, minutes_old, rng.choice(["STARTUP", "GROWTH", "SCALE", "ENTERPRISE"]), round(rng.random(), 3), recoverable))
+            timestamp = (now - timedelta(minutes=minutes_old)).isoformat()
+            customer_segment = "ENTERPRISE" if amount > 5000 else "GROWTH" if amount > 1500 else "SMB"
+            risk_score = round(rng.uniform(0.1, 0.9), 2)
+            rows.append((f"TX{index+1:04d}", f"CUS{rng.randint(1, 1000):03d}", f"MER{rng.randint(1, 40):02d}", amount, "INR", timestamp, rng.choice(["UPI", "CARD", "NETBANKING", "WALLET"]), "FAILED" if failed else "SUCCESS", reason, retry_count, success_rate, rng.randint(1, 80), minutes_old, customer_segment, risk_score, recoverable))
         connection.executemany("INSERT INTO transactions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
 
     try:
@@ -259,6 +264,12 @@ def initialise() -> None:
                 status = 'COMPLETED'
             WHERE status = 'COMPLETED' AND (successful_recoveries != total_events OR revenue_recovered != revenue_at_risk);
         """)
+    except Exception:
+        pass
+
+    try:
+        from services.security_service import backfill_audit_chain
+        backfill_audit_chain(connection)
     except Exception:
         pass
 
@@ -790,6 +801,24 @@ def batch_transactions_endpoint(batch_id: int, limit: int = 500) -> list[dict[st
 @app.get("/audit-logs")
 def audit_logs(search: str | None = None, limit: int = Query(100, le=500)) -> list[dict[str, Any]]:
     initialise(); connection = connect(); rows = connection.execute("SELECT * FROM audit_logs WHERE (? IS NULL OR transaction_id LIKE ? OR description LIKE ?) ORDER BY timestamp DESC LIMIT ?", (search, f"%{search}%", f"%{search}%", limit)).fetchall(); connection.close(); return [{**dict(row), "metadata": (json.loads(row["metadata"]) if row["metadata"] else {})} for row in rows]
+
+
+@app.get("/api/audit/integrity")
+@app.get("/audit/integrity")
+def audit_integrity() -> dict[str, Any]:
+    from services.security_service import verify_audit_chain
+    initialise()
+    connection = connect()
+    try:
+        result = verify_audit_chain(connection)
+        return {
+            **result,
+            "algorithm": "SHA-256",
+            "chain_standard": "canonical_json_v1",
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+    finally:
+        connection.close()
 
 
 # ========================================================

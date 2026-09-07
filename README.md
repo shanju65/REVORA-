@@ -783,6 +783,18 @@ Revora must never:
 
 ---
 
+## Audit Integrity — SHA-256 Hash Chaining
+
+Revora implements cryptographic SHA-256 hash chaining to provide **tamper-evident integrity protection** for its operational audit trail.
+
+- **Tamper-Evident Ledger**: Every audit event computes a cryptographic SHA-256 hash derived from a canonical JSON representation of its core audit fields (`actor`, `description`, `event_type`, `metadata`, `timestamp`, `transaction_id`) cryptographically chained to the preceding record's `previous_event_hash`.
+- **Deterministic Canonical Representation**: Payloads are serialized using deterministic canonical JSON formatting (`sort_keys=True`, compact separators, UTF-8 encoding) ensuring identical input always produces the exact same hash.
+- **Zero Credential Exposure**: Sensitive payment credentials (CVV, OTP, PIN, PAN, card numbers, passwords, API keys, secrets) are strictly rejected and scrubbed prior to canonical serialization.
+- **Cryptographic Verification**: The `GET /api/audit/integrity` endpoint walks the entire chain chronologically, validating parent linkages and recalculating event hashes to detect any tampering or record alteration.
+- **Accurate Integrity Scope**: SHA-256 hash chaining makes unauthorized modifications, retroactive tampering, and record deletions mathematically detectable. It does not encrypt audit records or prevent direct database compromise; it delivers verifiable, tamper-evident governance proof.
+
+---
+
 # Limitations
 
 Revora is a buildathon prototype.
