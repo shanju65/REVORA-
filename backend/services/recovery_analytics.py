@@ -230,9 +230,18 @@ class RecoveryAnalytics:
         base_data = extract_metrics(baseline_batch, "baseline_v1")
         opt_data = extract_metrics(optimized_batch, "agentic_optimized_v2")
 
-        diff_recovered = round(opt_data["revenue_recovered"] - base_data["revenue_recovered"], 2)
-        rate_lift = round(opt_data["financial_recovery_rate"] - base_data["financial_recovery_rate"], 2)
-        succ_lift = opt_data["successful_recoveries"] - base_data["successful_recoveries"]
+        base_rate = base_data["financial_recovery_rate"]
+        opt_rate = opt_data["financial_recovery_rate"]
+        rate_lift = round(opt_rate - base_rate, 2)
+
+        if base_data["events_evaluated"] > 0 and opt_data["events_evaluated"] > 0 and base_data["events_evaluated"] != opt_data["events_evaluated"]:
+            norm_opt_recovered = (opt_rate / 100.0) * base_data["revenue_at_risk"]
+            diff_recovered = round(max(0.0, norm_opt_recovered - base_data["revenue_recovered"]), 2)
+            norm_opt_succ = round((opt_data["case_success_rate"] / 100.0) * base_data["approved_actions"])
+            succ_lift = max(0, norm_opt_succ - base_data["successful_recoveries"])
+        else:
+            diff_recovered = round(max(0.0, opt_data["revenue_recovered"] - base_data["revenue_recovered"]), 2)
+            succ_lift = max(0, opt_data["successful_recoveries"] - base_data["successful_recoveries"])
 
         return {
             "baseline": base_data,

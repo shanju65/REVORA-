@@ -1140,13 +1140,15 @@ class GenerateReportRequest(BaseModel):
 
 
 @app.post("/api/reports/generate")
-def api_generate_report(payload: GenerateReportRequest) -> dict[str, Any]:
+@app.post("/reports/generate")
+def api_generate_report(payload: GenerateReportRequest = GenerateReportRequest()) -> dict[str, Any]:
     from services.report_service import ReportService
     initialise()
-    return ReportService(connect).generate_report(batch_id=payload.batch_id)
+    return ReportService(connect).generate_report(batch_id=payload.batch_id if payload else None)
 
 
 @app.get("/api/reports/latest")
+@app.get("/reports/latest")
 def api_get_latest_report() -> dict[str, Any]:
     from services.report_service import ReportService
     initialise()
@@ -1154,10 +1156,27 @@ def api_get_latest_report() -> dict[str, Any]:
 
 
 @app.get("/api/reports/{batch_id}")
+@app.get("/reports/{batch_id}")
 def api_get_report_by_batch(batch_id: int) -> dict[str, Any]:
     from services.report_service import ReportService
     initialise()
     return ReportService(connect).generate_report(batch_id=batch_id)
+
+
+@app.get("/analytics/policy-comparison")
+@app.get("/api/analytics/policy-comparison")
+def api_policy_comparison() -> dict[str, Any]:
+    from services.recovery_analytics import RecoveryAnalytics
+    initialise()
+    return RecoveryAnalytics(connect).get_policy_comparison()
+
+
+@app.get("/analytics/agent-insights")
+@app.get("/api/analytics/agent-insights")
+def api_agent_insights() -> list[dict[str, Any]]:
+    from services.recovery_analytics import RecoveryAnalytics
+    initialise()
+    return RecoveryAnalytics(connect).get_agent_insights()
 
 
 # ========================================================

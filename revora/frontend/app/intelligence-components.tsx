@@ -11,16 +11,16 @@ export type Item = Record<string, any>;
 export function VisualRecoveryFunnel({ metrics }: { metrics: Record<string, any> }) {
   const [activeStage, setActiveStage] = useState<number | null>(null);
 
-  const totalAtRisk = Number(metrics.revenue_at_risk || 1262244.77);
-  const eligibleAmount = Number(metrics.recovery_actions_amount || 209928.88);
-  const recoveredAmount = Number(metrics.revenue_recovered || 122432.67);
-  const totalCases = Number(metrics.total_failed_payments || metrics.evaluated_cases || 329);
-  const candidatesCount = Number(metrics.recovery_candidates || 58);
-  const approvedCount = Number(metrics.total_recovery_attempts || 58);
-  const successCount = Number(metrics.successful_recoveries || 32);
-  const blockedCount = Number(metrics.guardrail_blocked_cases || 52);
-  const stoppedCount = Number(metrics.stopped_cases || 219);
-  const failedCount = Number(metrics.failed_recoveries || 26);
+  const totalAtRisk = Number(metrics.revenue_at_risk || 0);
+  const eligibleAmount = Number(metrics.recovery_actions_amount || metrics.approved_amount || 0);
+  const recoveredAmount = Number(metrics.revenue_recovered || 0);
+  const totalCases = Number(metrics.total_failed_payments || metrics.evaluated_cases || metrics.events_evaluated || 0);
+  const candidatesCount = Number(metrics.recovery_candidates || metrics.approved_actions || 0);
+  const approvedCount = Number(metrics.total_recovery_attempts || metrics.approved_actions || metrics.actions_executed || 0);
+  const successCount = Number(metrics.successful_recoveries || 0);
+  const blockedCount = Number(metrics.guardrail_blocked_cases || metrics.blocked_cases || 0);
+  const stoppedCount = Number(metrics.stopped_cases || 0);
+  const failedCount = Number(metrics.failed_recoveries || metrics.failed_executions || 0);
 
   const stages = [
     {
@@ -40,10 +40,10 @@ export function VisualRecoveryFunnel({ metrics }: { metrics: Record<string, any>
       subtitle: "ML identified as transient & economically recoverable",
       amount: eligibleAmount,
       cases: candidatesCount,
-      pct: totalAtRisk > 0 ? Math.round((eligibleAmount / totalAtRisk) * 100) : 17,
+      pct: totalAtRisk > 0 ? Math.round((eligibleAmount / totalAtRisk) * 100) : 0,
       color: "#06b6d4",
       leakage: `${blockedCount} safety-gated by Policy Gateway`,
-      badge: `${totalCases > 0 ? ((candidatesCount / totalCases) * 100).toFixed(1) : "17.6"}% Qualified`,
+      badge: `${totalCases > 0 ? ((candidatesCount / totalCases) * 100).toFixed(1) : "0.0"}% Qualified`,
     },
     {
       id: "executed",
@@ -51,7 +51,7 @@ export function VisualRecoveryFunnel({ metrics }: { metrics: Record<string, any>
       subtitle: "Passed deterministic invariants & routed to provider",
       amount: eligibleAmount,
       cases: approvedCount,
-      pct: totalAtRisk > 0 ? Math.round((eligibleAmount / totalAtRisk) * 100) : 17,
+      pct: totalAtRisk > 0 ? Math.round((eligibleAmount / totalAtRisk) * 100) : 0,
       color: "#f59e0b",
       leakage: `${failedCount} unrecoverable after smart backoff retry`,
       badge: "100% Policy Compliant",
@@ -62,10 +62,10 @@ export function VisualRecoveryFunnel({ metrics }: { metrics: Record<string, any>
       subtitle: "Funds settled in gateway & ledger hash committed",
       amount: recoveredAmount,
       cases: successCount,
-      pct: totalAtRisk > 0 ? Math.round((recoveredAmount / totalAtRisk) * 100) : 10,
+      pct: totalAtRisk > 0 ? Math.round((recoveredAmount / totalAtRisk) * 100) : 0,
       color: "#10b981",
       leakage: "Zero funds lost to unauthorized retries",
-      badge: `${candidatesCount > 0 ? ((successCount / candidatesCount) * 100).toFixed(1) : "55.2"}% Success Rate`,
+      badge: `${approvedCount > 0 ? ((successCount / approvedCount) * 100).toFixed(1) : "0.0"}% Success Rate`,
     },
   ];
 
@@ -172,17 +172,17 @@ export function VisualRecoveryFunnel({ metrics }: { metrics: Record<string, any>
       <div className="funnel-performance-strip">
         <div className="perf-item">
           <label>Intervention Success Rate</label>
-          <b>{metrics.intervention_success_rate || "55.2"}%</b>
-          <small>32 of 58 attempts settled</small>
+          <b>{metrics.intervention_success_rate ?? (approvedCount > 0 ? ((successCount / approvedCount) * 100).toFixed(1) : "0.0")}%</b>
+          <small>{successCount} of {approvedCount} attempts settled</small>
         </div>
         <div className="perf-item">
           <label>Average Case Value</label>
-          <b>{formatMoney(totalCases > 0 ? Math.round(totalAtRisk / totalCases) : 3836)}</b>
+          <b>{formatMoney(totalCases > 0 ? Math.round(totalAtRisk / totalCases) : 0)}</b>
           <small>across {totalCases} failure events</small>
         </div>
         <div className="perf-item">
           <label>Capital Gated by Guardrails</label>
-          <b>{formatMoney(blockedCount * 2200)}</b>
+          <b>{formatMoney(Number(metrics.guardrail_blocked_amount || (blockedCount * (totalCases > 0 ? Math.round(totalAtRisk / totalCases) : 0))))}</b>
           <small>{blockedCount} cases protected from penalty</small>
         </div>
         <div className="perf-item">
@@ -228,8 +228,11 @@ export function OutcomeDonutChart({ outcomes }: { outcomes: Item[] }) {
   const cy = 100;
   const strokeWidth = 26;
   const circumference = 2 * Math.PI * radius;
-
-  const activeItem = data.find((d) => d.outcome === hoveredOutcome) || data[3]; // default to SUCCESS
+  const activeItem =
+    (hoveredOutcome ? data.find((d) => d.outcome === hoveredOutcome) : null) ||
+    data.find((d) => d.outcome === "SUCCESS") ||
+    data[0] ||
+    { outcome: "SUCCESS", count: total, color: "#10b981", label: "Recovered (Success)" };
 
   return (
     <div className="chart-panel-card">
@@ -276,10 +279,10 @@ export function OutcomeDonutChart({ outcomes }: { outcomes: Item[] }) {
           {/* Center Cutout Info */}
           <div className="donut-center-info">
             <span className="center-pct">
-              {total > 0 ? ((activeItem.count / total) * 100).toFixed(1) : 0}%
+              {total > 0 && activeItem ? ((activeItem.count / total) * 100).toFixed(1) : "0"}%
             </span>
-            <b className="center-title">{activeItem.label.split(" ")[0]}</b>
-            <small className="center-count">{activeItem.count.toLocaleString()}</small>
+            <b className="center-title">{activeItem?.label ? activeItem.label.split(" ")[0] : "Yield"}</b>
+            <small className="center-count">{activeItem?.count ? activeItem.count.toLocaleString() : "0"}</small>
           </div>
         </div>
 
@@ -420,8 +423,9 @@ export function BatchPerformanceTrendChart({ batches }: { batches: Item[] }) {
   const paddingX = 40;
   const paddingY = 30;
 
+  const denom = Math.max(1, recentBatches.length - 1);
   const points = recentBatches.map((b, i) => {
-    const x = paddingX + (i * (width - 2 * paddingX)) / (recentBatches.length - 1);
+    const x = paddingX + (i * (width - 2 * paddingX)) / denom;
     const normalizedY = (Number(b.revenue_recovered || 0) - minVal) / (maxVal - minVal || 1);
     const y = height - paddingY - normalizedY * (height - 2 * paddingY);
     return { x, y, batch: b };
