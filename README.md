@@ -11,10 +11,6 @@
 [![Gemini](https://img.shields.io/badge/LLM-Google%20Gemini-6366f1?style=flat-square)](#)
 [![Razorpay](https://img.shields.io/badge/Payments-Razorpay%20Test%20Sandbox-0ea5e9?style=flat-square)](#)
 
----
-
-# REVORA
-
 **Bounded-autonomy recovery engine for failed payments.**
 
 An LLM-assisted agent proposes a recovery intervention. A deterministic policy gateway — not the model — decides whether that intervention is allowed to execute. Every stage is written to a SHA-256 hash-chained audit ledger.
